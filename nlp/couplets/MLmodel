@@ -1,0 +1,7 @@
+artifact_path: couplets
+flavors:
+  python_function:
+    code: .
+    data: model
+    loader_module: couplet_mlflow
+    python_version: 3.7.6
