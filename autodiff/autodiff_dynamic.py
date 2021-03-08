@@ -1,4 +1,5 @@
 import numpy as np
+from abc import ABCMeta, abstractmethod
 
 
 class Tensor(object):
@@ -91,12 +92,14 @@ class Tensor(object):
     __rmul__ = __mul__
 
 
-class Op(object):
+class Op(metaclass=ABCMeta):
+    @abstractmethod
     def forward(self, from_tensors):
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def backward(self, from_tensors, grad):
-        raise NotImplementedError
+        pass
 
 
 class AddOp(Op):
