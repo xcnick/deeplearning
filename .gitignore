@@ -125,7 +125,7 @@ dmypy.json
 tensorflow_code
 
 # Models
-models
+/models
 proc_data
 
 # examples
