@@ -1,0 +1,16 @@
+train_args = dict(
+    batch_size=256,
+    repeat_times=1,
+    target_step=1024,
+    max_memo=131072,
+    reward_scale=1,
+    gamma=0.99,
+    soft_update_tau=5e-3,
+    explore_rate=0.1,
+    explore_noise=0.1,
+    if_allow_break=True,
+    break_step=1048576,
+    eval_times1=4,
+    eval_times2=16,
+    show_gap=256,
+)
