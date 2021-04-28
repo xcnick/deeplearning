@@ -39,7 +39,7 @@ class AgentBase:
         :return array action: action.shape==(action_dim, ), (action.min(), action.max())==(-1, +1)
         """
         states = torch.as_tensor((state,), dtype=torch.float32, device=device).detach_()
-        action = self.act(states)[0]
+        action = self.actor(states)[0]
         return action.cpu().numpy()
 
     def select_actions(self, states) -> np.ndarray:
@@ -48,7 +48,7 @@ class AgentBase:
         :return array action: action.shape==(-1, action_dim), (action.min(), action.max())==(-1, +1)
         """
         states = torch.as_tensor(states, dtype=torch.float32, device=device).detach_()
-        actions = self.act(states)
+        actions = self.actor(states)
         return actions.cpu().numpy()  # -1 < action < +1
 
     def explore_env(self, env, buffer, target_step, reward_scale, gamma) -> int:
@@ -83,24 +83,24 @@ class AgentBase:
         :str cwd: current working directory, we save model file here
         :bool if_save: save model or load model
         """
-        act_save_path = "{}/actor.pth".format(cwd)
-        cri_save_path = "{}/critic.pth".format(cwd)
+        actor_save_path = "{}/actor.pth".format(cwd)
+        critic_save_path = "{}/critic.pth".format(cwd)
 
         def load_torch_file(network, save_path):
             network_dict = torch.load(save_path, map_location=lambda storage, loc: storage)
             network.load_state_dict(network_dict)
 
         if if_save:
-            if self.act is not None:
-                torch.save(self.act.state_dict(), act_save_path)
-            if self.cri is not None:
-                torch.save(self.cri.state_dict(), cri_save_path)
-        elif (self.act is not None) and os.path.exists(act_save_path):
-            load_torch_file(self.act, act_save_path)
-            print("Loaded act:", cwd)
-        elif (self.cri is not None) and os.path.exists(cri_save_path):
-            load_torch_file(self.cri, cri_save_path)
-            print("Loaded cri:", cwd)
+            if self.actor is not None:
+                torch.save(self.actor.state_dict(), actor_save_path)
+            if self.critic is not None:
+                torch.save(self.critic.state_dict(), critic_save_path)
+        elif (self.actor is not None) and os.path.exists(actor_save_path):
+            load_torch_file(self.actor, actor_save_path)
+            print("Loaded actor:", cwd)
+        elif (self.critic is not None) and os.path.exists(critic_save_path):
+            load_torch_file(self.critic, critic_save_path)
+            print("Loaded critic:", cwd)
         else:
             print("FileNotFound when load_model: {}".format(cwd))
 

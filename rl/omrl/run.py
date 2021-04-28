@@ -8,7 +8,6 @@ import cv2
 
 from copy import deepcopy
 from .buffer import ReplayBuffer
-from .env import PreprocessEnv
 
 
 def explore_before_training(env, buffer, target_step, reward_scale, gamma) -> int:
@@ -257,11 +256,64 @@ def get_episode_return(env, act, device) -> float:
         a_tensor = act(s_tensor)
         if if_discrete:
             a_tensor = a_tensor.argmax(dim=1)
-        action = a_tensor.cpu().numpy()[
-            0
-        ]  # not need detach(), because with torch.no_grad() outside
+        # not need detach(), because with torch.no_grad() outside
+        action = a_tensor.cpu().numpy()[0]
         state, reward, done, _ = env.step(action)
         episode_return += reward
         if done:
             break
     return env.episode_return if hasattr(env, "episode_return") else episode_return
+
+
+def get_video_to_watch_gym_render(agent, env):
+    from gym import wrappers
+    from pyvirtualdisplay import Display
+
+    display = Display(visible=0, size=(400, 300))
+    display.start()
+
+    agent_name = agent.__class__.__name__
+    cwd = f"./{agent_name}/{env.unwrapped.spec.id}"
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if agent is not None:
+        agent.save_load_model(cwd=cwd, if_save=False)
+        rd.seed(194686)
+        torch.manual_seed(1942876)
+
+    """initialize evaluete and env.render()"""
+    save_frame_dir = os.path.join(cwd, "video")
+    env = wrappers.Monitor(env, save_frame_dir, force=True)
+
+    if not os.path.exists(save_frame_dir):
+        os.makedirs(save_frame_dir, exist_ok=True)
+
+    state = env.reset()
+    episode_return = 0
+    step = 0
+    episodes = 10
+    episode = 0
+    with torch.no_grad():
+        while episode < episodes:
+            if agent is not None:
+                s_tensor = torch.as_tensor((state,), dtype=torch.float32, device=device)
+                a_tensor = agent.actor(s_tensor)
+                if env.if_discrete:
+                    a_tensor = a_tensor.argmax(dim=1)
+                action = a_tensor.cpu().numpy()[0]
+            else:
+                action = env.action_space.sample()
+            next_state, reward, done, _ = env.step(action)
+
+            episode_return += reward
+            step += 1
+
+            if done:
+                episode += 1
+                print(f"{episode:>6}, {step:6.0f}, {episode_return:8.3f}, {reward:8.3f}")
+                state = env.reset()
+                episode_return = 0
+                step = 0
+            else:
+                state = next_state
+        env.close()

@@ -17,3 +17,7 @@
 - [couplets](nlp/couplets)，对联算法；
 
 ## [cv](cv)
+
+## [Reinforcement Learning](rl)
+
+- [omrl](rl/omrl)，强化学习框架，使用配置文件形式管理算法、模型、参数等。
