@@ -1,43 +1,39 @@
 import math
 import os
 import logging
-import tensorflow as tf
+import mindspore
+import mindspore.nn as nn
+import mindspore.ops as ops
+from mindspore.train.serialization import load_checkpoint, load_param_into_net
 
 logger = logging.getLogger(__name__)
 
 ACT2FN = {
-    "relu": tf.keras.activations.relu,
-    "swish": tf.keras.activations.swish,
-    "gelu": lambda x: tf.keras.activations.gelu(x, approximate=False),
-    "tanh": tf.keras.activations.tanh,
-    "gelu_new": lambda x: tf.keras.activations.gelu(x, approximate=True),
+    "relu": ops.ReLU(),
+    "swish": ops.HSwish(),
+    "gelu": ops.GeLU(),
+    "tanh": ops.Tanh(),
 }
 
 
 def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError(
-            "function {} not found in ACT2FN mapping {}".format(
-                activation_string, list(ACT2FN.keys())
-            )
-        )
+    return ACT2FN[activation_string]
 
 
-class TFPreTrainedModel(tf.keras.Model):
+class MSPreTrainedModel(nn.Cell):
     def __init__(self, config, **kwargs):
         super().__init__()
         self.config = config
-        self.weights_name = "model_tf.bin"
+        self.weights_name = "model_ms.ckpt"
 
     @classmethod
     def from_pretrained(cls, config, model_path, **kwargs):
         model = cls(config, **kwargs)
 
-        model(tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]], dtype=tf.int32))
+        # model(tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]], dtype=tf.int32))
 
-        model.load_weights(model_path)
+        param_dict = load_checkpoint(model_path)
+        load_param_into_net(model, param_dict)
         # state_dict = torch.load(model_path, map_location="cpu")
 
         # # copy state_dict so _load_from_state_dict can modify it
@@ -116,24 +112,28 @@ class TFPreTrainedModel(tf.keras.Model):
 
         logger.info("Model weights saved in {}".format(output_model_file))
 
-    def get_extended_attention_mask(self, attention_mask, input_shape, device):
-        if tf.ndim(attention_mask) == 3:
-            extended_attention_mask = attention_mask[:, tf.newaxis, :, :]
-        elif tf.ndim(attention_mask) == 2:
-            extended_attention_mask = attention_mask[:, tf.newaxis, tf.newaxis, :]
-        else:
-            raise ValueError(
-                "Wrong shape for input_ids (shape {}) or attention_mask (shape {})".format(
-                    input_shape, attention_mask.shape
-                )
-            )
+    def get_extended_attention_mask(self, attention_mask, input_shape):
+        extended_attention_mask = None
+        expand_dims = ops.ExpandDims()
+        if attention_mask.ndim == 3:
+            extended_attention_mask = expand_dims(attention_mask, 1)
+        elif attention_mask.ndim == 2:
+            attention_mask = expand_dims(attention_mask, 1)
+            extended_attention_mask = expand_dims(attention_mask, 1)
+        # else:
+        #     raise ValueError(
+        #         "Wrong shape for input_ids (shape {}) or attention_mask (shape {})".format(
+        #             input_shape, attention_mask.shape
+        #         )
+        #     )
 
         # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
         # masked positions, this operation will create a tensor which is 0.0 for
         # positions we want to attend and -10000.0 for masked positions.
         # Since we are adding it to the raw scores before the softmax, this is
         # effectively the same as removing these entirely.
-        extended_attention_mask = tf.cast(extended_attention_mask, tf.float32)
+        cast = ops.Cast()
+        extended_attention_mask = cast(extended_attention_mask, mindspore.float32)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         return extended_attention_mask

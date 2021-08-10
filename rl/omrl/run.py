@@ -71,8 +71,11 @@ def atari_explore_before_training(env, buffer, target_step, reward_scale, gamma)
 
 
 def train_and_evaluate(cfg_args, agent, env):
-    agent_name = agent.__class__.__name__
-    cwd = f"./{agent_name}/{env.unwrapped.spec.id}"
+    if "train_url" not in cfg_args:
+        agent_name = agent.__class__.__name__
+        cwd = f"./{agent_name}/{env.unwrapped.spec.id}"
+    else:
+        cwd = cfg_args["train_url"]
 
     print(f"| cwd: {cwd}")
     os.makedirs(cwd, exist_ok=True)

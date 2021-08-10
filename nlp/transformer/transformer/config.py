@@ -2,7 +2,7 @@ import json
 
 
 class ConfigBase(object):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         for key, value in kwargs.items():
             try:
                 setattr(self, key, value)
