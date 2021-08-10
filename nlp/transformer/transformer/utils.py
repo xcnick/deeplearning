@@ -4,16 +4,17 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch import Tensor, device
+from typing import Union, Tuple, Optional, Callable, Any
 
 logger = logging.getLogger(__name__)
 
 
-def swish(x):
+def swish(x: Tensor) -> Tensor:
     return x * torch.sigmoid(x)
 
 
-def _gelu_python(x):
+def _gelu_python(x: Tensor) -> Tensor:
     """ Original Implementation of the gelu activation function in Google Bert repo when initially created.
         For information: OpenAI GPT's gelu is slightly different (and gives slightly different results):
         0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
@@ -23,7 +24,7 @@ def _gelu_python(x):
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
 
-def gelu_new(x):
+def gelu_new(x: Tensor) -> Tensor:
     """ Implementation of the gelu activation function currently in Google Bert repo (identical to OpenAI GPT).
         Also see https://arxiv.org/abs/1606.08415
     """
@@ -45,7 +46,7 @@ ACT2FN = {
 }
 
 
-def get_activation(activation_string):
+def get_activation(activation_string: str) -> Callable[[Tensor], Any]:
     if activation_string in ACT2FN:
         return ACT2FN[activation_string]
     else:
@@ -57,13 +58,15 @@ def get_activation(activation_string):
 
 
 class PreTrainedModel(nn.Module):
-    def __init__(self, config, **kwargs):
+    def __init__(self, config: Callable[..., None], **kwargs):
         super().__init__()
         self.config = config
         self.weights_name = "model_pt.bin"
 
     @classmethod
-    def from_pretrained(cls, config, model_path, **kwargs):
+    def from_pretrained(
+        cls, config: Callable[..., None], model_path: str, **kwargs
+    ) -> "PreTrainedModel":
         model = cls(config, **kwargs)
         if not os.path.isfile(model_path):
             raise f"Error no file named {model_path} found"
@@ -125,7 +128,7 @@ class PreTrainedModel(nn.Module):
 
         return model
 
-    def save_pretrained(self, save_directory):
+    def save_pretrained(self, save_directory: str):
         """ Save a model and its configuration file to a directory, so that it
             can be re-loaded using the `:func:`~transformers.PreTrainedModel.from_pretrained`` class method.
 
@@ -146,7 +149,12 @@ class PreTrainedModel(nn.Module):
 
         logger.info("Model weights saved in {}".format(output_model_file))
 
-    def get_extended_attention_mask(self, attention_mask, input_shape, device):
+    def get_extended_attention_mask(
+        self,
+        attention_mask: Tensor,
+        input_shape: Tuple[int],
+        device: Optional[Union[int, device]] = None,
+    ):
         if attention_mask.dim() == 3:
             extended_attention_mask = attention_mask[:, None, :, :]
         elif attention_mask.dim() == 2:

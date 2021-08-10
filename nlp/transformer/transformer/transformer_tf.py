@@ -1,21 +1,20 @@
-import copy
-
 import tensorflow as tf
 
+from typing import Tuple, Optional, Callable
 from .utils_tf import get_activation
 
 
 class TFEncoder(tf.keras.layers.Layer):
     def __init__(
         self,
-        num_hidden_layers,
-        d_model,
-        nhead,
-        d_feedforward,
-        attention_probs_dropout_prob,
-        hidden_dropout_prob,
-        hidden_act="relu",
-    ):
+        num_hidden_layers: int,
+        d_model: int,
+        nhead: int,
+        d_feedforward: int,
+        attention_probs_dropout_prob: float,
+        hidden_dropout_prob: float,
+        hidden_act: str = "relu",
+    ) -> None:
         super().__init__()
         self.layers = [
             TFEncoderLayer(
@@ -30,7 +29,9 @@ class TFEncoder(tf.keras.layers.Layer):
             for i in range(num_hidden_layers)
         ]
 
-    def call(self, x, mask, training=False):
+    def call(
+        self, x: tf.Tensor, mask: Optional[tf.Tensor], training: Optional[bool] = False
+    ) -> Tuple[tf.Tensor, ...]:
         for layer in self.layers:
             x, attn = layer(x, mask, training=training)
         return x, attn
@@ -39,25 +40,26 @@ class TFEncoder(tf.keras.layers.Layer):
 class TFEncoderLayer(tf.keras.layers.Layer):
     def __init__(
         self,
-        d_model,
-        nhead,
-        d_feedforward=2048,
-        attention_probs_dropout_prob=0.1,
-        hidden_dropout_prob=0.1,
-        hidden_act="relu",
+        d_model: int,
+        nhead: int,
+        d_feedforward: int = 2048,
+        attention_probs_dropout_prob: float = 0.1,
+        hidden_dropout_prob: float = 0.1,
+        hidden_act: str = "relu",
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.self = TFMultiHeadAttention(d_model, nhead, attention_probs_dropout_prob)
         self.feed_forward = TFPositionwiseFeedForward(
             d_model, d_feedforward, hidden_dropout_prob, hidden_act
         )
         self.add_norm = [
-            TFAddNormLayer(d_model, hidden_dropout_prob, name="add_norm_{}".format(i))
-            for i in range(2)
+            TFAddNormLayer(hidden_dropout_prob, name="add_norm_{}".format(i)) for i in range(2)
         ]
 
-    def call(self, x, mask=None, training=False):
+    def call(
+        self, x: tf.Tensor, mask: Optional[tf.Tensor] = None, training: Optional[bool] = False
+    ) -> Tuple[tf.Tensor, ...]:
         x1, attn = self.self(x, x, x, mask, training=training)
         x = self.add_norm[0](x, x1, training=training)
         x1 = self.feed_forward(x, training=training)
@@ -66,17 +68,23 @@ class TFEncoderLayer(tf.keras.layers.Layer):
 
 
 class TFAddNormLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, hidden_dropout_prob, **kwargs):
+    def __init__(self, hidden_dropout_prob: float, **kwargs) -> None:
         super().__init__(**kwargs)
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-12, name="layer_norm")
         self.dropout = tf.keras.layers.Dropout(hidden_dropout_prob)
 
-    def call(self, x, x1, training=False):
+    def call(self, x: tf.Tensor, x1: tf.Tensor, training: Optional[bool] = False):
         return self.layer_norm(x + self.dropout(x1, training=training))
 
 
 class TFPositionwiseFeedForward(tf.keras.layers.Layer):
-    def __init__(self, d_model, d_feedforward, hidden_dropout_prob=0.1, hidden_act="relu"):
+    def __init__(
+        self,
+        d_model: int,
+        d_feedforward: int,
+        hidden_dropout_prob: Optional[float] = 0.1,
+        hidden_act: Optional[str] = "relu",
+    ) -> None:
         super().__init__()
         self.hidden_act = hidden_act
         self.intermediate = tf.keras.layers.Dense(
@@ -91,14 +99,16 @@ class TFPositionwiseFeedForward(tf.keras.layers.Layer):
         )
         self.dropout = tf.keras.layers.Dropout(hidden_dropout_prob)
 
-    def call(self, x, training=False):
+    def call(self, x: tf.Tensor, training: Optional[bool] = False) -> tf.Tensor:
         return self.dense(
             self.dropout(get_activation(self.hidden_act)(self.intermediate(x)), training=training)
         )
 
 
 class TFMultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, d_model=512, n_head=8, attention_probs_dropout_prob=0.1):
+    def __init__(
+        self, d_model: int = 512, n_head: int = 8, attention_probs_dropout_prob: float = 0.1
+    ) -> None:
         super().__init__()
 
         self.d_model = d_model
@@ -127,7 +137,14 @@ class TFMultiHeadAttention(tf.keras.layers.Layer):
             name="dense",
         )
 
-    def call(self, query, key, value, mask=None, training=False):
+    def call(
+        self,
+        query: tf.Tensor,
+        key: tf.Tensor,
+        value: tf.Tensor,
+        mask: Optional[tf.Tensor] = None,
+        training: Optional[bool] = False,
+    ) -> Tuple[tf.Tensor, ...]:
         batch_size = query.shape[0]
 
         query = self.query(query)
@@ -153,11 +170,18 @@ class TFMultiHeadAttention(tf.keras.layers.Layer):
 
 
 class TFScaledDotProductAttention(tf.keras.layers.Layer):
-    def __init__(self, attention_probs_dropout_prob=0.0):
+    def __init__(self, attention_probs_dropout_prob: float = 0.0) -> None:
         super().__init__()
         self.dropout = tf.keras.layers.Dropout(attention_probs_dropout_prob)
 
-    def call(self, query, key, value, attn_mask=None, training=False):
+    def call(
+        self,
+        query: tf.Tensor,
+        key: tf.Tensor,
+        value: tf.Tensor,
+        attn_mask: Optional[tf.Tensor] = None,
+        training: Optional[bool] = False,
+    ) -> Tuple[tf.Tensor, ...]:
         r"""
         Args:
             query: [batch, len_query, dim_query]

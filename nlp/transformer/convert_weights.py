@@ -3,6 +3,7 @@ import logging
 
 import torch
 import tensorflow as tf
+import mindspore
 
 from transformer.bert import (
     BertConfig,
@@ -30,6 +31,12 @@ from transformer.bert_tf import (
     load_huggingface_weights_in_bert_to_tf,
 )
 
+from transformer.bert_ms import (
+    MSBertForPreTraining,
+    load_tf_weights_in_bert_to_ms,
+    load_huggingface_weights_in_bert_to_ms,
+)
+
 logging.basicConfig(level=logging.INFO)
 
 MODEL_CLASSES = {
@@ -40,6 +47,7 @@ MODEL_CLASSES = {
         "gpt2": (GPT2Config, GPT2Model),
     },
     "tf": {"bert": (BertConfig, TFBertForPreTraining)},
+    "ms": {"bert": (BertConfig, MSBertForPreTraining)},
 }
 
 LOAD_WEIGHTS_MAPS = {
@@ -52,6 +60,9 @@ LOAD_WEIGHTS_MAPS = {
     "tf": {
         "bert": {"tf": load_tf_weights_in_bert_to_tf, "hf": load_huggingface_weights_in_bert_to_tf}
     },
+    "ms": {
+        "bert": {"tf": load_tf_weights_in_bert_to_ms, "hf": load_huggingface_weights_in_bert_to_ms}
+    },
 }
 
 
@@ -61,14 +72,16 @@ def convert_weights(model_type, from_model, from_path, config_path, to_model, du
     model = model_class(config)
     load_weights_fct = LOAD_WEIGHTS_MAPS[to_model][model_type][from_model]
     if to_model == "tf":
-        input_ids = tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]], dtype=tf.int32)
+        input_ids = tf.ones([3, 4], dtype=tf.int32)
         model(input_ids)
     load_weights_fct(model, config, from_path)
 
     if to_model == "pt":
         torch.save(model.state_dict(), dump_path)
-    else:
+    elif to_model == "tf":
         model.save_weights(dump_path)
+    else:
+        mindspore.save_checkpoint(model, dump_path)
     print("Save {} model to {}".format(to_model, dump_path))
 
 
@@ -96,7 +109,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("--config_path", type=str, help="Config file path.")
     parser.add_argument(
-        "--to_model", type=str, required=True, choices=("tf", "pt"), help="To model : tf and pt",
+        "--to_model",
+        type=str,
+        required=True,
+        choices=("tf", "pt", "ms"),
+        help="To model : tf / pt / ms",
     )
     parser.add_argument(
         "--dump_path", default=None, type=str, required=True, help="Output model file path"

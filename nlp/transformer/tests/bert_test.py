@@ -1,6 +1,7 @@
-import unittest
+import pytest
 
 import torch
+import transformers
 from transformer.bert import (
     BertConfig,
     BertForPreTraining,
@@ -9,45 +10,54 @@ from transformer.bert import (
 )
 
 
-class TestBertModel(unittest.TestCase):
+class TestBertModel:
     @classmethod
-    def setUpClass(cls):
-        cls.config_file_path = "/home/orient/chi/model/uncased_L-12_H-768_A-12/bert_config.json"
-        cls.tf_checkpoint_path = "/home/orient/chi/model/uncased_L-12_H-768_A-12/bert_model.ckpt"
-        cls.huggingface_model_path = "/home/orient/chi/model/uncased_L-12_H-768_A-12"
-        cls.model_path = "/home/orient/chi/model/uncased_L-12_H-768_A-12/bert_model_pt.bin"
+    def setup_class(cls):
+        cls.config_file_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
+        cls.tf_checkpoint_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/bert_model.ckpt"
+        cls.huggingface_model_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12"
+        cls.model_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/bert_model_pt.bin"
         cls.config = BertConfig.from_json_file(cls.config_file_path)
         cls.model_tf = BertForPreTraining(cls.config)
         cls.model_hf = BertForPreTraining(cls.config)
+        cls.model_base = transformers.BertModel.from_pretrained(
+            cls.huggingface_model_path, return_dict=True
+        )
+        cls.model_base.eval()
+        cls.model_base_mlm = transformers.BertForPreTraining.from_pretrained(
+            cls.huggingface_model_path, return_dict=True
+        )
+        cls.model_base_mlm.eval()
         cls.model = BertForPreTraining.from_pretrained(cls.config, cls.model_path)
         cls.model.eval()
+        cls.batch_size = 4
+        cls.seq_length = 10
+        cls.tokens_tensor = torch.randint(
+            low=1, high=100, size=(cls.batch_size, cls.seq_length), dtype=torch.long
+        )
 
     @classmethod
-    def tearDownClass(cls):
+    def teardown_class(cls):
         pass
 
     def test_config(self):
-        self.assertEqual(self.config.vocab_size, 30522)
-        self.assertEqual(self.config.hidden_size, 768)
-        self.assertEqual(self.config.num_hidden_layers, 12)
-        self.assertEqual(self.config.num_attention_heads, 12)
-        self.assertEqual(self.config.intermediate_size, 3072)
-        self.assertEqual(self.config.hidden_act, "gelu")
-        self.assertEqual(self.config.hidden_dropout_prob, 0.1)
-        self.assertEqual(self.config.attention_probs_dropout_prob, 0.1)
-        self.assertEqual(self.config.max_position_embeddings, 512)
-        self.assertEqual(self.config.type_vocab_size, 2)
-        self.assertEqual(self.config.initializer_range, 0.02)
+        assert self.config.vocab_size == 30522
+        assert self.config.hidden_size == 768
+        assert self.config.num_hidden_layers == 12
+        assert self.config.num_attention_heads == 12
+        assert self.config.intermediate_size == 3072
+        assert self.config.hidden_act == "gelu"
+        assert self.config.hidden_dropout_prob - 0.1 < 1e-5
+        assert self.config.attention_probs_dropout_prob - 0.1 < 1e-5
+        assert self.config.max_position_embeddings == 512
+        assert self.config.type_vocab_size == 2
+        assert self.config.initializer_range - 0.02 < 1e-5
 
     def test_model(self):
-        batch_size = 4
-        seq_length = 10
-        tokens_tensor = torch.randint(0, 100, (batch_size, seq_length))
-
-        encoder_outputs, pooled_outputs, prediction_scores = self.model(tokens_tensor)
-        self.assertEqual(encoder_outputs.shape, (batch_size, seq_length, self.config.hidden_size))
-        self.assertEqual(pooled_outputs.shape, (batch_size, self.config.hidden_size))
-        self.assertEqual(prediction_scores.shape, (batch_size, seq_length, self.config.vocab_size))
+        encoder_outputs, pooled_outputs, prediction_scores = self.model(self.tokens_tensor)
+        assert encoder_outputs.shape == (self.batch_size, self.seq_length, self.config.hidden_size)
+        assert pooled_outputs.shape == (self.batch_size, self.config.hidden_size)
+        assert prediction_scores.shape == (self.batch_size, self.seq_length, self.config.vocab_size)
 
     def test_tf_and_huggingface_compare(self):
         load_tf_weights_in_bert(self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
@@ -58,15 +68,14 @@ class TestBertModel(unittest.TestCase):
         )
         self.model_hf.eval()
 
-        for tf_param, pt_param in zip(self.model_tf.state_dict(), self.model_hf.state_dict()):
-            self.assertTrue(
-                torch.equal(
-                    self.model_tf.state_dict()[tf_param], self.model_hf.state_dict()[pt_param]
-                )
+        for tf_param, hf_param in zip(self.model_tf.state_dict(), self.model_hf.state_dict()):
+            assert torch.equal(
+                self.model_tf.state_dict()[tf_param], self.model_hf.state_dict()[hf_param]
             )
+
         for tf_param, pt_param in zip(self.model_tf.state_dict(), self.model.state_dict()):
-            self.assertTrue(
-                torch.equal(self.model_tf.state_dict()[tf_param], self.model.state_dict()[pt_param])
+            assert torch.equal(
+                self.model_tf.state_dict()[tf_param], self.model.state_dict()[pt_param]
             )
 
     def test_model_forward(self):
@@ -78,16 +87,20 @@ class TestBertModel(unittest.TestCase):
         )
         self.model_hf.eval()
 
-        input_ids = [101, 2023, 2003, 1037, 7953, 102]
+        tf_encoder_output, tf_pooled_output, tf_mlm_output = self.model_tf(self.tokens_tensor)
+        hf_encoder_output, hf_pooled_output, hf_mlm_output = self.model_hf(self.tokens_tensor)
+        encoder_output, pooled_output, mlm_output = self.model(self.tokens_tensor)
+        base_output = self.model_base(self.tokens_tensor)
+        base_mlm_output = self.model_base_mlm(self.tokens_tensor)
 
-        tokens_tensor = torch.tensor(input_ids).unsqueeze(0)
-        tf_encoder_output, tf_pooled_output, tf_mlm_output = self.model_tf(tokens_tensor)
-        hf_encoder_output, hf_pooled_output, hf_mlm_output = self.model_hf(tokens_tensor)
-        encoder_output, pooled_output, mlm_output = self.model(tokens_tensor)
+        assert torch.max(torch.abs(hf_encoder_output - base_output["last_hidden_state"])) < 1e-5
+        assert torch.max(torch.abs(hf_pooled_output - base_output["pooler_output"])) < 1e-5
+        assert torch.max(torch.abs(hf_mlm_output - base_mlm_output["prediction_logits"])) < 1e-4
 
-        self.assertTrue(torch.max(torch.abs(tf_encoder_output - hf_encoder_output)) < 1e-5)
-        self.assertTrue(torch.max(torch.abs(tf_pooled_output - hf_pooled_output)) < 1e-5)
-        self.assertTrue(torch.max(torch.abs(tf_mlm_output - hf_mlm_output)) < 1e-4)
-        self.assertTrue(torch.max(torch.abs(tf_encoder_output - encoder_output)) < 1e-5)
-        self.assertTrue(torch.max(torch.abs(tf_pooled_output - pooled_output)) < 1e-5)
-        self.assertTrue(torch.max(torch.abs(tf_mlm_output - mlm_output)) < 1e-4)
+        assert torch.max(torch.abs(tf_encoder_output - base_output["last_hidden_state"])) < 1e-5
+        assert torch.max(torch.abs(tf_pooled_output - base_output["pooler_output"])) < 1e-5
+        assert torch.max(torch.abs(tf_mlm_output - base_mlm_output["prediction_logits"])) < 1e-4
+
+        assert torch.max(torch.abs(encoder_output - base_output["last_hidden_state"])) < 1e-5
+        assert torch.max(torch.abs(pooled_output - base_output["pooler_output"])) < 1e-5
+        assert torch.max(torch.abs(mlm_output - base_mlm_output["prediction_logits"])) < 1e-4

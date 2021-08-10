@@ -1,0 +1,43 @@
+FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu20.04
+
+RUN export DEBIAN_FRONTEND=noninteractive && \
+    sed -i s@/archive.ubuntu.com/@/mirrors.bfsu.edu.cn/@g /etc/apt/sources.list && \
+    rm -rf /etc/apt/sources.list.d/ && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    sudo \
+    curl \
+    ca-certificates \
+    libgmp-dev \
+    patch \
+    autoconf \
+    libtool \
+    automake \
+    flex \
+    libnuma-dev \
+    nasm \
+    patchelf && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -o ~/miniconda.sh  https://mirrors.bfsu.edu.cn/anaconda/miniconda/Miniconda3-py37_4.10.3-Linux-x86_64.sh && \
+    chmod +x ~/miniconda.sh && \
+    ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh
+
+ENV PATH /opt/conda/bin:/usr/local/bin:$PATH
+
+RUN conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/main/ && \
+    conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/free/ && \
+    conda install cmake=3.18 ninja pytest mkl-devel && conda clean -ay
+
+RUN groupadd -g 1000 xcnick && useradd -u 1000 -g 1000 -m -d /home/xcnick xcnick -s /bin/bash && \
+    adduser xcnick sudo && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER xcnick
+
+RUN pip config set global.index-url https://mirrors.bfsu.edu.cn/pypi/web/simple
+
+ENV PATH /home/xcnick/.local/bin:$PATH
+
+WORKDIR /workspace

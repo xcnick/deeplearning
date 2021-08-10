@@ -1,28 +1,27 @@
-import json
-
 import tensorflow as tf
 
-from .transformer_tf import TFAddNormLayer, TFEncoder
+from .transformer_tf import TFEncoder
 from .config import ConfigBase
 from .utils_tf import get_activation, TFPreTrainedModel
+from typing import Tuple, Optional, Callable
 
 
 class BertConfig(ConfigBase):
     def __init__(
         self,
-        vocab_size=30522,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        initializer_range=0.02,
+        vocab_size: int = 30522,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: str = "gelu",
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 512,
+        type_vocab_size: int = 16,
+        initializer_range: float = 0.02,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -38,7 +37,7 @@ class BertConfig(ConfigBase):
 
 
 class TFBertEmbeddings(tf.keras.layers.Layer):
-    def __init__(self, config):
+    def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.token_embeddings = tf.keras.layers.Embedding(
             config.vocab_size,
@@ -62,7 +61,12 @@ class TFBertEmbeddings(tf.keras.layers.Layer):
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-12, name="LayerNorm")
         self.dropout = tf.keras.layers.Dropout(config.hidden_dropout_prob)
 
-    def call(self, input_ids, token_type_ids=None, position_ids=None):
+    def call(
+        self,
+        input_ids: tf.Tensor,
+        token_type_ids: Optional[tf.Tensor] = None,
+        position_ids: Optional[tf.Tensor] = None,
+    ) -> tf.Tensor:
         input_shape = input_ids.shape
         seq_length = input_shape[1]
 
@@ -83,7 +87,7 @@ class TFBertEmbeddings(tf.keras.layers.Layer):
 
 
 class TFBertPooler(tf.keras.layers.Layer):
-    def __init__(self, config):
+    def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = tf.keras.layers.Dense(
             config.hidden_size,
@@ -92,14 +96,14 @@ class TFBertPooler(tf.keras.layers.Layer):
             name="dense",
         )
 
-    def call(self, hidden_states):
+    def call(self, hidden_states: tf.Tensor) -> tf.Tensor:
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense(first_token_tensor)
         return pooled_output
 
 
 class TFBertModel(TFPreTrainedModel):
-    def __init__(self, config, **kwargs):
+    def __init__(self, config: Callable[..., None], **kwargs) -> None:
         super().__init__(config, **kwargs)
         self.embeddings = TFBertEmbeddings(config)
         self.encoder = TFEncoder(
@@ -114,8 +118,13 @@ class TFBertModel(TFPreTrainedModel):
         self.pooler = TFBertPooler(config)
 
     def call(
-        self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, training=False
-    ):
+        self,
+        input_ids: tf.Tensor,
+        attention_mask: Optional[tf.Tensor] = None,
+        token_type_ids: Optional[tf.Tensor] = None,
+        position_ids: Optional[tf.Tensor] = None,
+        training: Optional[bool] = False,
+    ) -> Tuple[tf.Tensor, ...]:
         if input_ids is not None:
             input_shape = input_ids.shape
         else:
