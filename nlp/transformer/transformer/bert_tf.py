@@ -1,9 +1,9 @@
 import tensorflow as tf
+from typing import Tuple, Optional, Callable, Dict
 
 from .transformer_tf import TFEncoder
 from .config import ConfigBase
 from .utils_tf import get_activation, TFPreTrainedModel
-from typing import Tuple, Optional, Callable
 
 
 class BertConfig(ConfigBase):
@@ -118,13 +118,12 @@ class TFBertModel(TFPreTrainedModel):
         self.pooler = TFBertPooler(config)
 
     def call(
-        self,
-        input_ids: tf.Tensor,
-        attention_mask: Optional[tf.Tensor] = None,
-        token_type_ids: Optional[tf.Tensor] = None,
-        position_ids: Optional[tf.Tensor] = None,
-        training: Optional[bool] = False,
+        self, inputs: Dict[str, tf.Tensor], training: Optional[bool] = False,
     ) -> Tuple[tf.Tensor, ...]:
+        input_ids = inputs.get("input_ids")
+        attention_mask = inputs.get("attention_mask")
+        token_type_ids = inputs.get("token_type_ids")
+        position_ids = inputs.get("position_ids")
         if input_ids is not None:
             input_shape = input_ids.shape
         else:
@@ -152,7 +151,7 @@ class TFBertModel(TFPreTrainedModel):
 
 
 class TFBertPredictionHeadTransform(tf.keras.layers.Layer):
-    def __init__(self, config):
+    def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = tf.keras.layers.Dense(
             config.hidden_size,
@@ -162,7 +161,7 @@ class TFBertPredictionHeadTransform(tf.keras.layers.Layer):
         self.transform_act_fn = get_activation(config.hidden_act)
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-12, name="layer_norm")
 
-    def call(self, hidden_states):
+    def call(self, hidden_states: tf.Tensor) -> tf.Tensor:
         hidden_states = self.dense(hidden_states)
         hidden_states = self.transform_act_fn(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
@@ -170,7 +169,7 @@ class TFBertPredictionHeadTransform(tf.keras.layers.Layer):
 
 
 class TFBertLMPredictionHead(tf.keras.layers.Layer):
-    def __init__(self, config):
+    def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.transform = TFBertPredictionHeadTransform(config)
         self.decoder = tf.keras.layers.Dense(
@@ -179,35 +178,32 @@ class TFBertLMPredictionHead(tf.keras.layers.Layer):
             name="dense",
         )
 
-    def call(self, hidden_states):
+    def call(self, hidden_states: tf.Tensor) -> tf.Tensor:
         hidden_states = self.transform(hidden_states)
         hidden_states = self.decoder(hidden_states)
         return hidden_states
 
 
 class TFBertOnlyMLMHead(tf.keras.layers.Layer):
-    def __init__(self, config):
+    def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.predictions = TFBertLMPredictionHead(config)
 
-    def call(self, sequence_output):
+    def call(self, sequence_output: tf.Tensor) -> tf.Tensor:
         prediction_scores = self.predictions(sequence_output)
         return prediction_scores
 
 
 class TFBertForPreTraining(TFPreTrainedModel):
-    def __init__(self, config, **kwargs):
+    def __init__(self, config: Callable[..., None], **kwargs) -> None:
         super().__init__(config, **kwargs)
-        self.bert = TFBertModel(config)
+        self.bert = TFBertModel(config, **kwargs)
         self.cls = TFBertOnlyMLMHead(config)
 
-    def call(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None):
-        outputs = self.bert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-        )
+    def call(
+        self, inputs=Dict[str, tf.Tensor], training: Optional[bool] = False
+    ) -> Tuple[tf.Tensor, ...]:
+        outputs = self.bert(inputs, training=training)
 
         sequence_output, pooled_output = outputs
         prediction_scores = self.cls(sequence_output)
@@ -217,7 +213,12 @@ class TFBertForPreTraining(TFPreTrainedModel):
         return outputs
 
 
-def load_tf_weights_in_bert_to_tf(model, config, tf_checkpoint_path, with_mlm=True):
+def load_tf_weights_in_bert_to_tf(
+    model: "tf.keras.Model",
+    config: Callable[..., None],
+    tf_checkpoint_path: str,
+    with_mlm: bool = True,
+) -> None:
     try:
         import tensorflow as tf
         import numpy as np
@@ -310,7 +311,12 @@ def load_tf_weights_in_bert_to_tf(model, config, tf_checkpoint_path, with_mlm=Tr
     )
 
 
-def load_huggingface_weights_in_bert_to_tf(model, config, pytorch_model_path, with_mlm=True):
+def load_huggingface_weights_in_bert_to_tf(
+    model: "tf.keras.Model",
+    config: Callable[..., None],
+    pytorch_model_path: str,
+    with_mlm: bool = True,
+) -> None:
     try:
         from transformers import BertForPreTraining
     except ImportError:

@@ -28,7 +28,7 @@ ENV PATH /opt/conda/bin:/usr/local/bin:$PATH
 
 RUN conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/main/ && \
     conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/free/ && \
-    conda install cmake=3.18 ninja pytest mkl-devel && conda clean -ay
+    conda install cmake=3.18 ninja pytest mkl-devel ipykernel black && conda clean -ay
 
 RUN groupadd -g 1000 xcnick && useradd -u 1000 -g 1000 -m -d /home/xcnick xcnick -s /bin/bash && \
     adduser xcnick sudo && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
