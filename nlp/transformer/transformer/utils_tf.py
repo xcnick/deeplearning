@@ -2,6 +2,8 @@ import math
 import os
 import logging
 import tensorflow as tf
+from typing import Tuple, Callable, Any
+
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,7 @@ ACT2FN = {
 }
 
 
-def get_activation(activation_string):
+def get_activation(activation_string: str) -> Callable[[Tensor], Any]:
     if activation_string in ACT2FN:
         return ACT2FN[activation_string]
     else:
@@ -26,16 +28,31 @@ def get_activation(activation_string):
 
 
 class TFPreTrainedModel(tf.keras.Model):
-    def __init__(self, config, **kwargs):
-        super().__init__()
+    def __init__(self, config: Callable[..., None], **kwargs) -> None:
+        super().__init__(**kwargs)
         self.config = config
         self.weights_name = "model_tf.bin"
 
     @classmethod
-    def from_pretrained(cls, config, model_path, **kwargs):
+    def from_pretrained(
+        cls, config: Callable[..., None], model_path: str, **kwargs
+    ) -> "TFPreTrainedModel":
         model = cls(config, **kwargs)
 
-        model(tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]], dtype=tf.int32))
+        # inputs = {
+        #     "input_ids": tf.zeros((1, 1), dtype=tf.int32),
+        #     "attention_mask": tf.zeros((1, 1), dtype=tf.int32),
+        #     "token_type_ids": tf.zeros((1, 1), dtype=tf.int32),
+        #     "position_ids": tf.zeros((1, 1), dtype=tf.int32),
+        # }
+        model(
+            {
+                "input_ids": tf.zeros((1, 1), dtype=tf.int32),
+                "attention_mask": tf.zeros((1, 1), dtype=tf.int32),
+                "token_type_ids": tf.zeros((1, 1), dtype=tf.int32),
+                "position_ids": tf.zeros((1, 1), dtype=tf.int32),
+            }
+        )
 
         model.load_weights(model_path)
         # state_dict = torch.load(model_path, map_location="cpu")
@@ -95,7 +112,7 @@ class TFPreTrainedModel(tf.keras.Model):
 
         return model
 
-    def save_pretrained(self, save_directory):
+    def save_pretrained(self, save_directory: str) -> None:
         """ Save a model and its configuration file to a directory, so that it
             can be re-loaded using the `:func:`~transformers.PreTrainedModel.from_pretrained`` class method.
 
@@ -116,7 +133,9 @@ class TFPreTrainedModel(tf.keras.Model):
 
         logger.info("Model weights saved in {}".format(output_model_file))
 
-    def get_extended_attention_mask(self, attention_mask, input_shape, device):
+    def get_extended_attention_mask(
+        self, attention_mask: tf.Tensor, input_shape: Tuple[int, ...]
+    ) -> tf.Tensor:
         if tf.ndim(attention_mask) == 3:
             extended_attention_mask = attention_mask[:, tf.newaxis, :, :]
         elif tf.ndim(attention_mask) == 2:

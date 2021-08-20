@@ -36,7 +36,12 @@ class TestTFBertModel:
         cls.model = TFBertForPreTraining.from_pretrained(cls.config, cls.model_path)
         cls.batch_size = 4
         cls.seq_length = 10
-        cls.tokens_tensor = tf.random.uniform(shape=(4, 10), minval=1, maxval=10, dtype=tf.int32)
+        cls.tokens_tensor = {
+            "input_ids": tf.random.uniform(shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
+            "attention_mask": tf.random.uniform(shape=(4, 10), minval=0, maxval=1, dtype=tf.int32),
+            "token_type_ids": tf.random.uniform(shape=(4, 10), minval=0, maxval=1, dtype=tf.int32),
+            "position_ids": tf.random.uniform(shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
+        }
 
     @classmethod
     def teardown_class(cls):
@@ -92,9 +97,17 @@ class TestTFBertModel:
         tf_encoder_output, tf_pooled_output, tf_mlm_output = self.model_tf(self.tokens_tensor)
         hf_encoder_output, hf_pooled_output, hf_mlm_output = self.model_hf(self.tokens_tensor)
         encoder_output, pooled_output, mlm_output = self.model(self.tokens_tensor)
-        base_output = self.model_base(torch.tensor(self.tokens_tensor.numpy(), dtype=torch.long))
+        base_output = self.model_base(
+            torch.tensor(self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
+            torch.tensor(self.tokens_tensor["attention_mask"].numpy(), dtype=torch.long),
+            torch.tensor(self.tokens_tensor["token_type_ids"].numpy(), dtype=torch.long),
+            torch.tensor(self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
+        )
         base_mlm_output = self.model_base_mlm(
-            torch.tensor(self.tokens_tensor.numpy(), dtype=torch.long)
+            torch.tensor(self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
+            torch.tensor(self.tokens_tensor["attention_mask"].numpy(), dtype=torch.long),
+            torch.tensor(self.tokens_tensor["token_type_ids"].numpy(), dtype=torch.long),
+            torch.tensor(self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
         )
 
         last_hidden_state = base_output["last_hidden_state"].detach().numpy()
