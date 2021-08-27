@@ -18,10 +18,10 @@ for gpu in gpus:
 class TestTFBertModel:
     @classmethod
     def setup_class(cls):
-        cls.config_file_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
-        cls.tf_checkpoint_path = "/mnt/data/models/uncased_L-12_H-768_A-12/bert_model.ckpt"
-        cls.huggingface_model_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12"
-        cls.model_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/model_tf.bin"
+        cls.config_file_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
+        cls.tf_checkpoint_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_model.ckpt"
+        cls.huggingface_model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12"
+        cls.model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/model_tf.bin"
         cls.config = BertConfig.from_json_file(cls.config_file_path)
         cls.model_tf = TFBertForPreTraining(cls.config)
         cls.model_hf = TFBertForPreTraining(cls.config)
