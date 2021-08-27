@@ -16,7 +16,7 @@ ACT2FN = {
 }
 
 
-def get_activation(activation_string: str) -> Callable[[Tensor], Any]:
+def get_activation(activation_string: str) -> Callable[[tf.Tensor], Any]:
     if activation_string in ACT2FN:
         return ACT2FN[activation_string]
     else:
