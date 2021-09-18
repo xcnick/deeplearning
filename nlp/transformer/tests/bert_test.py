@@ -2,8 +2,8 @@ import pytest
 
 import torch
 import transformers
-from transformer.bert import (
-    BertConfig,
+from transformer.transformer.config import ConfigBase
+from transformer.transformer.bert import (
     BertForPreTraining,
     load_tf_weights_in_bert,
     load_huggingface_weights_in_bert,
@@ -13,11 +13,11 @@ from transformer.bert import (
 class TestBertModel:
     @classmethod
     def setup_class(cls):
-        cls.config_file_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
-        cls.tf_checkpoint_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/bert_model.ckpt"
-        cls.huggingface_model_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12"
-        cls.model_path = "/mnt/data/models/nlp/uncased_L-12_H-768_A-12/bert_model_pt.bin"
-        cls.config = BertConfig.from_json_file(cls.config_file_path)
+        cls.config_file_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
+        cls.tf_checkpoint_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_model.ckpt"
+        cls.huggingface_model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12"
+        cls.model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/model_pt.bin"
+        cls.config = ConfigBase(cls.config_file_path)
         cls.model_tf = BertForPreTraining(cls.config)
         cls.model_hf = BertForPreTraining(cls.config)
         cls.model_base = transformers.BertModel.from_pretrained(

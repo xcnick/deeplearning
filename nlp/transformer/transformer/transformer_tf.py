@@ -145,7 +145,7 @@ class TFMultiHeadAttention(tf.keras.layers.Layer):
         mask: Optional[tf.Tensor] = None,
         training: Optional[bool] = False,
     ) -> Tuple[tf.Tensor, ...]:
-        batch_size = query.shape[0]
+        batch_size = tf.shape(query)[0]
 
         query = self.query(query)
         key = self.key(key)

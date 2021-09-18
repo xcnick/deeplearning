@@ -1,39 +1,10 @@
 import tensorflow as tf
-from typing import Tuple, Optional, Callable, Dict
+from typing import Optional, Callable, Dict, Union, Any
 
 from .transformer_tf import TFEncoder
-from .config import ConfigBase
 from .utils_tf import get_activation, TFPreTrainedModel
 
-
-class BertConfig(ConfigBase):
-    def __init__(
-        self,
-        vocab_size: int = 30522,
-        hidden_size: int = 768,
-        num_hidden_layers: int = 12,
-        num_attention_heads: int = 12,
-        intermediate_size: int = 3072,
-        hidden_act: str = "gelu",
-        hidden_dropout_prob: float = 0.1,
-        attention_probs_dropout_prob: float = 0.1,
-        max_position_embeddings: int = 512,
-        type_vocab_size: int = 16,
-        initializer_range: float = 0.02,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.vocab_size = vocab_size
-        self.hidden_size = hidden_size
-        self.num_hidden_layers = num_hidden_layers
-        self.num_attention_heads = num_attention_heads
-        self.intermediate_size = intermediate_size
-        self.hidden_act = hidden_act
-        self.hidden_dropout_prob = hidden_dropout_prob
-        self.attention_probs_dropout_prob = attention_probs_dropout_prob
-        self.max_position_embeddings = max_position_embeddings
-        self.type_vocab_size = type_vocab_size
-        self.initializer_range = initializer_range
+from transformer.builder import TF_MODELS
 
 
 class TFBertEmbeddings(tf.keras.layers.Layer):
@@ -67,12 +38,12 @@ class TFBertEmbeddings(tf.keras.layers.Layer):
         token_type_ids: Optional[tf.Tensor] = None,
         position_ids: Optional[tf.Tensor] = None,
     ) -> tf.Tensor:
-        input_shape = input_ids.shape
+        input_shape = tf.shape(input_ids)
         seq_length = input_shape[1]
 
         if token_type_ids is None:
-            token_type_ids = tf.fill(input_shape, 0)
-        if position_ids == None:
+            token_type_ids = tf.ones(input_shape, dtype=tf.int32)
+        if position_ids is None:
             position_ids = tf.range(seq_length, dtype=tf.int32)[tf.newaxis, :]
 
         input_embeddings = self.token_embeddings(input_ids)
@@ -102,35 +73,36 @@ class TFBertPooler(tf.keras.layers.Layer):
         return pooled_output
 
 
+@TF_MODELS.register_module()
 class TFBertModel(TFPreTrainedModel):
-    def __init__(self, config: Callable[..., None], **kwargs) -> None:
+    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs) -> None:
         super().__init__(config, **kwargs)
-        self.embeddings = TFBertEmbeddings(config)
+        self.embeddings = TFBertEmbeddings(self.config)
         self.encoder = TFEncoder(
-            config.num_hidden_layers,
-            config.hidden_size,
-            config.num_attention_heads,
-            config.intermediate_size,
-            config.attention_probs_dropout_prob,
-            config.hidden_dropout_prob,
-            config.hidden_act,
+            self.config.num_hidden_layers,
+            self.config.hidden_size,
+            self.config.num_attention_heads,
+            self.config.intermediate_size,
+            self.config.attention_probs_dropout_prob,
+            self.config.hidden_dropout_prob,
+            self.config.hidden_act,
         )
-        self.pooler = TFBertPooler(config)
+        self.pooler = TFBertPooler(self.config)
 
     def call(
         self, inputs: Dict[str, tf.Tensor], training: Optional[bool] = False,
-    ) -> Tuple[tf.Tensor, ...]:
+    ) -> Dict[str, tf.Tensor]:
         input_ids = inputs.get("input_ids")
         attention_mask = inputs.get("attention_mask")
         token_type_ids = inputs.get("token_type_ids")
         position_ids = inputs.get("position_ids")
         if input_ids is not None:
-            input_shape = input_ids.shape
+            input_shape = tf.shape(input_ids)
         else:
             raise ValueError("You have to specify input_ids")
 
         if attention_mask is None:
-            attention_mask = tf.fill(input_shape, 0)
+            attention_mask = tf.ones(input_shape)
 
         extended_attention_mask = attention_mask[:, tf.newaxis, tf.newaxis, :]
         extended_attention_mask = tf.cast(extended_attention_mask, tf.float32)
@@ -138,16 +110,13 @@ class TFBertModel(TFPreTrainedModel):
 
         embeddings = self.embeddings(input_ids, token_type_ids, position_ids, training=training)
 
-        encoder_outputs, attention_outputs = self.encoder(
+        encoder_output, attention_output = self.encoder(
             embeddings, extended_attention_mask, training=training
         )
-        pooled_outputs = self.pooler(encoder_outputs)
-        outputs = (
-            encoder_outputs,
-            pooled_outputs,
-        )
+        pooled_output = self.pooler(encoder_output)
+        output_dict = {"encoder_output": encoder_output, "pooled_output": pooled_output}
 
-        return outputs
+        return output_dict
 
 
 class TFBertPredictionHeadTransform(tf.keras.layers.Layer):
@@ -194,23 +163,33 @@ class TFBertOnlyMLMHead(tf.keras.layers.Layer):
         return prediction_scores
 
 
+@TF_MODELS.register_module()
 class TFBertForPreTraining(TFPreTrainedModel):
-    def __init__(self, config: Callable[..., None], **kwargs) -> None:
+    def __init__(
+        self, config: Union[Dict[str, Any], Callable[..., None]], model_path: Optional[str] = None, **kwargs
+    ) -> None:
         super().__init__(config, **kwargs)
-        self.bert = TFBertModel(config, **kwargs)
-        self.cls = TFBertOnlyMLMHead(config)
+        self.bert = TFBertModel(self.config, **kwargs)
+        self.cls = TFBertOnlyMLMHead(self.config)
+        if model_path is not None:
+            self._load_weights(model_path)
 
     def call(
         self, inputs=Dict[str, tf.Tensor], training: Optional[bool] = False
-    ) -> Tuple[tf.Tensor, ...]:
-        outputs = self.bert(inputs, training=training)
+    ) -> Dict[str, tf.Tensor]:
+        output_dict = self.bert(inputs, training=training)
 
-        sequence_output, pooled_output = outputs
-        prediction_scores = self.cls(sequence_output)
+        prediction_scores = self.cls(output_dict["encoder_output"])
+        output_dict.update({"prediction_scores": prediction_scores})
 
-        outputs = outputs + (prediction_scores,)
+        return output_dict
 
-        return outputs
+    def _load_weights(self, model_path: str = None) -> None:
+        inputs = {
+            "input_ids": tf.zeros((1, 1), dtype=tf.int32),
+        }
+        self(inputs, training=False)
+        self.load_weights(model_path)
 
 
 def load_tf_weights_in_bert_to_tf(

@@ -3,9 +3,9 @@ import pytest
 import tensorflow as tf
 import torch
 import transformers
-from transformer.bert_tf import (
-    BertConfig,
-    TFBertForPreTraining,
+from transformer.builder import build_config, build_tf_models
+
+from transformer.transformer.bert_tf import (
     load_tf_weights_in_bert_to_tf,
     load_huggingface_weights_in_bert_to_tf,
 )
@@ -18,13 +18,17 @@ for gpu in gpus:
 class TestTFBertModel:
     @classmethod
     def setup_class(cls):
-        cls.config_file_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
-        cls.tf_checkpoint_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_model.ckpt"
-        cls.huggingface_model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12"
-        cls.model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/model_tf.bin"
-        cls.config = BertConfig.from_json_file(cls.config_file_path)
-        cls.model_tf = TFBertForPreTraining(cls.config)
-        cls.model_hf = TFBertForPreTraining(cls.config)
+        cls.config_file_path = "/workspace/models/nlp/chinese_wwm_ext/bert_config.json"
+        cls.tf_checkpoint_path = "/workspace/models/nlp/chinese_wwm_ext/bert_model.ckpt"
+        cls.huggingface_model_path = "/workspace/models/nlp/chinese_wwm_ext"
+        cls.model_path = "/workspace/models/nlp/chinese_wwm_ext/model_tf.bin"
+        model_cfg = dict(
+            type="TFBertForPreTraining",
+            config=dict(type="ConfigBase", json_file=cls.config_file_path),
+        )
+        cls.config = build_config(model_cfg["config"])
+        cls.model_tf = build_tf_models(model_cfg)
+        cls.model_hf = build_tf_models(model_cfg)
         cls.model_base = transformers.BertModel.from_pretrained(
             cls.huggingface_model_path, return_dict=True
         )
@@ -33,7 +37,8 @@ class TestTFBertModel:
             cls.huggingface_model_path, return_dict=True
         )
         cls.model_base_mlm.eval()
-        cls.model = TFBertForPreTraining.from_pretrained(cls.config, cls.model_path)
+        model_cfg.update({"model_path": cls.model_path})
+        cls.model = build_tf_models(model_cfg)
         cls.batch_size = 4
         cls.seq_length = 10
         cls.tokens_tensor = {
@@ -48,7 +53,7 @@ class TestTFBertModel:
         pass
 
     def test_config(self):
-        assert self.config.vocab_size == 30522
+        assert self.config.vocab_size == 21128
         assert self.config.hidden_size == 768
         assert self.config.num_hidden_layers == 12
         assert self.config.num_attention_heads == 12
@@ -61,9 +66,12 @@ class TestTFBertModel:
         assert self.config.initializer_range - 0.02 < 1e-5
 
     def test_model(self):
-        encoder_outputs, pooled_outputs, prediction_scores = self.model(self.tokens_tensor)
-        assert encoder_outputs.shape == (self.batch_size, self.seq_length, self.config.hidden_size)
-        assert pooled_outputs.shape == (self.batch_size, self.config.hidden_size)
+        output_dict = self.model(self.tokens_tensor)
+        encoder_output = output_dict["encoder_output"]
+        pooled_output = output_dict["pooled_output"]
+        prediction_scores = output_dict["prediction_scores"]
+        assert encoder_output.shape == (self.batch_size, self.seq_length, self.config.hidden_size)
+        assert pooled_output.shape == (self.batch_size, self.config.hidden_size)
         assert prediction_scores.shape == (self.batch_size, self.seq_length, self.config.vocab_size)
 
     def test_tf_and_huggingface_compare(self):
@@ -77,11 +85,11 @@ class TestTFBertModel:
             self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
         )
 
-        for tf_param, pt_param in zip(self.model_tf.variables, self.model_hf.variables):
-            assert tf.reduce_all(tf.equal(tf_param.value(), pt_param.value()))
+        for tf_param, pt_param in zip(self.model_tf.weights, self.model_hf.weights):
+            assert tf.reduce_all(tf.equal(tf_param.numpy(), pt_param.numpy()))
 
-        for tf_param, pt_param in zip(self.model_tf.variables, self.model.variables):
-            assert tf.reduce_all(tf.equal(tf_param.value(), pt_param.value()))
+        for tf_param, pt_param in zip(self.model_tf.weights, self.model.weights):
+            assert tf.reduce_all(tf.equal(tf_param.numpy(), pt_param.numpy()))
 
     def test_model_forward(self):
         self.model_tf(self.tokens_tensor)
@@ -94,9 +102,24 @@ class TestTFBertModel:
             self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
         )
 
-        tf_encoder_output, tf_pooled_output, tf_mlm_output = self.model_tf(self.tokens_tensor)
-        hf_encoder_output, hf_pooled_output, hf_mlm_output = self.model_hf(self.tokens_tensor)
-        encoder_output, pooled_output, mlm_output = self.model(self.tokens_tensor)
+        output_dict_tf = self.model_tf(self.tokens_tensor)
+        output_dict_hf = self.model_hf(self.tokens_tensor)
+        output_dict = self.model(self.tokens_tensor)
+        tf_encoder_output, tf_pooled_output, tf_mlm_output = (
+            output_dict_tf["encoder_output"],
+            output_dict_tf["pooled_output"],
+            output_dict_tf["prediction_scores"],
+        )
+        hf_encoder_output, hf_pooled_output, hf_mlm_output = (
+            output_dict_hf["encoder_output"],
+            output_dict_hf["pooled_output"],
+            output_dict_hf["prediction_scores"],
+        )
+        encoder_output, pooled_output, mlm_output = (
+            output_dict["encoder_output"],
+            output_dict["pooled_output"],
+            output_dict["prediction_scores"],
+        )
         base_output = self.model_base(
             torch.tensor(self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
             torch.tensor(self.tokens_tensor["attention_mask"].numpy(), dtype=torch.long),

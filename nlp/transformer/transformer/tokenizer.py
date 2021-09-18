@@ -1,6 +1,8 @@
 import unicodedata, re
 import collections
 
+from transformer.builder import TOKENIZERS
+
 
 def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
@@ -115,6 +117,7 @@ class BasicTokenizer(object):
         raise NotImplementedError
 
 
+@TOKENIZERS.register_module()
 class Tokenizer(BasicTokenizer):
     def __init__(self, vocab_file, do_lower_case=True, *args, **kwargs):
         super().__init__(*args, **kwargs)

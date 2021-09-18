@@ -1,9 +1,9 @@
-import math
 import os
 import logging
 import tensorflow as tf
-from typing import Tuple, Callable, Any
+from typing import Tuple, Callable, Dict, Union, Any
 
+from transformer import builder
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,10 @@ def get_activation(activation_string: str) -> Callable[[tf.Tensor], Any]:
 
 
 class TFPreTrainedModel(tf.keras.Model):
-    def __init__(self, config: Callable[..., None], **kwargs) -> None:
+    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs) -> None:
         super().__init__(**kwargs)
+        if isinstance(config, Dict):
+            config = builder.build_config(config)
         self.config = config
         self.weights_name = "model_tf.bin"
 
@@ -39,20 +41,10 @@ class TFPreTrainedModel(tf.keras.Model):
     ) -> "TFPreTrainedModel":
         model = cls(config, **kwargs)
 
-        # inputs = {
-        #     "input_ids": tf.zeros((1, 1), dtype=tf.int32),
-        #     "attention_mask": tf.zeros((1, 1), dtype=tf.int32),
-        #     "token_type_ids": tf.zeros((1, 1), dtype=tf.int32),
-        #     "position_ids": tf.zeros((1, 1), dtype=tf.int32),
-        # }
-        model(
-            {
-                "input_ids": tf.zeros((1, 1), dtype=tf.int32),
-                "attention_mask": tf.zeros((1, 1), dtype=tf.int32),
-                "token_type_ids": tf.zeros((1, 1), dtype=tf.int32),
-                "position_ids": tf.zeros((1, 1), dtype=tf.int32),
-            }
-        )
+        inputs = {
+            "input_ids": tf.zeros((1, 1), dtype=tf.int32),
+        }
+        model(inputs)
 
         model.load_weights(model_path)
         # state_dict = torch.load(model_path, map_location="cpu")
