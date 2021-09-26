@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.python.data.ops import dataset_ops
 
 
-from transformer.builder import PIPELINES
+from transformer.builder import TF_PIPELINES
 from transformer import builder
 
 
@@ -17,18 +17,16 @@ class DataPipeline(metaclass=ABCMeta):
         return dataset
 
 
-@PIPELINES.register_module()
+@TF_PIPELINES.register_module()
 class Dict2Dataset(DataPipeline):
-    def __init__(self, keys: List[str]=None):
+    def __init__(self, keys: List[str] = None):
         super().__init__()
         self.keys = keys
 
     def __call__(self, dataset: Union[Dict, dataset_ops.DatasetV2]):
         assert isinstance(dataset, Dict)
         dataset_dict = self.convert_dataset(dataset)
-        tf_dataset = tf.data.Dataset.from_tensor_slices(
-            dataset_dict
-        )
+        tf_dataset = tf.data.Dataset.from_tensor_slices(dataset_dict)
         return tf_dataset
 
     def convert_dataset(self, dataset: Union[Dict, dataset_ops.DatasetV2]):
@@ -44,7 +42,8 @@ class Dict2Dataset(DataPipeline):
 
         return dataset_dict
 
-@PIPELINES.register_module()
+
+@TF_PIPELINES.register_module()
 class Map(DataPipeline):
     def __init__(
         self,
@@ -59,7 +58,7 @@ class Map(DataPipeline):
 
         for i in range(len(transforms)):
             if isinstance(transforms[i], dict):
-                transforms[i] = builder.build_transforms(transforms[i])
+                transforms[i] = builder.build_tf_transforms(transforms[i])
 
             if not callable(transforms[i]):
                 raise TypeError("`Apply` requires each transform to be callable")
@@ -78,7 +77,7 @@ class Map(DataPipeline):
         return dataset
 
 
-@PIPELINES.register_module()
+@TF_PIPELINES.register_module()
 class Shuffle(DataPipeline):
     def __init__(self, buffer_size: int, seed: int = None, reshuffle_each_iteration: bool = None):
         super().__init__()
@@ -96,7 +95,7 @@ class Shuffle(DataPipeline):
         return dataset
 
 
-@PIPELINES.register_module()
+@TF_PIPELINES.register_module()
 class Repeat(DataPipeline):
     def __init__(self, count=None):
         super().__init__()
@@ -108,7 +107,7 @@ class Repeat(DataPipeline):
         return dataset
 
 
-@PIPELINES.register_module()
+@TF_PIPELINES.register_module()
 class Prefetch(DataPipeline):
     def __init__(self, buffer_size: tf.Tensor = tf.data.AUTOTUNE):
         super().__init__()
@@ -120,7 +119,7 @@ class Prefetch(DataPipeline):
         return dataset
 
 
-@PIPELINES.register_module()
+@TF_PIPELINES.register_module()
 class PaddedBatch(DataPipeline):
     def __init__(
         self,

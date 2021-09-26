@@ -1,9 +1,9 @@
 from tensorflow.python.data.ops import dataset_ops
 
-from transformer.builder import TRANSFORMS
+from transformer.builder import TF_TRANSFORMS
 
 
-@TRANSFORMS.register_module()
+@TF_TRANSFORMS.register_module()
 class Identity(object):
     def __init__(self):
         pass

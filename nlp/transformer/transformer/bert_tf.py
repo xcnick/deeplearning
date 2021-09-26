@@ -104,11 +104,14 @@ class TFBertModel(TFPreTrainedModel):
         if attention_mask is None:
             attention_mask = tf.ones(input_shape)
 
-        extended_attention_mask = attention_mask[:, tf.newaxis, tf.newaxis, :]
-        extended_attention_mask = tf.cast(extended_attention_mask, tf.float32)
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-
         embeddings = self.embeddings(input_ids, token_type_ids, position_ids, training=training)
+
+        extended_attention_mask = attention_mask[:, tf.newaxis, tf.newaxis, :]
+        extended_attention_mask = tf.cast(extended_attention_mask, dtype=embeddings.dtype)
+        one_cst = tf.constant(1.0, dtype=embeddings.dtype)
+        ten_thousand_cst = tf.constant(-10000.0, dtype=embeddings.dtype)
+        #extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        extended_attention_mask = tf.multiply(tf.subtract(one_cst, extended_attention_mask), ten_thousand_cst)
 
         encoder_output, attention_output = self.encoder(
             embeddings, extended_attention_mask, training=training

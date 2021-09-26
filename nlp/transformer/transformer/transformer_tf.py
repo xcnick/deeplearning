@@ -190,7 +190,7 @@ class TFScaledDotProductAttention(tf.keras.layers.Layer):
             attn_mask: [batch, len_query, len_key]
         """
         attention = tf.matmul(query, key, transpose_b=True)
-        dk = tf.cast(query.shape[-1], tf.float32)
+        dk = tf.cast(query.shape[-1], attention.dtype)
         attention = attention / tf.math.sqrt(dk)  # 缩放因子为 \sqrt{d_per_head}
         if attn_mask is not None:
             attention = attention + attn_mask

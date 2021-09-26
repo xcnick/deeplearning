@@ -49,7 +49,9 @@ class TFBertForSequenceClassification(TFPreTrainedModel):
         if self.num_labels == 1:
             self.loss_fct = tf.keras.losses.MeanSquaredError()
         else:
-            self.loss_fct = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+            self.loss_fct = tf.keras.losses.SparseCategoricalCrossentropy(
+                from_logits=True, reduction=tf.keras.losses.Reduction.NONE
+            )
 
         self.acc_fct = tf.keras.metrics.SparseCategoricalAccuracy()
         if model_path is not None:

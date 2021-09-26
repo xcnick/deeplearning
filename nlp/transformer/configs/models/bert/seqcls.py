@@ -1,4 +1,4 @@
-_base_ = ["../../datasets/THUCNews.py"]
+_base_ = ["../../datasets/THUCNews.py", "../../runtime/tf_runtime.py"]
 
 model = dict(
     type="TFBertForSequenceClassification",

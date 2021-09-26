@@ -59,13 +59,18 @@ class THUCNewsDataset(CustomDataset):
         self.pad_token = pad_token
         self.max_seq_length = max_seq_length
         self.special_tokens_count = special_tokens_count
+        self.num_samples = 0
 
         self.tokenizer = builder.build_tokenizers(tokenizer_cfg)
 
-    def __call__(self) -> Dict[str, List]:
+    def get_data_dict(self) -> Dict[str, List]:
         examples = self.read_examples_from_files(self.data_root, self.mode)
-        dataset_dict = self.get_dataset(examples)
+        dataset_dict = self.convert_examples_to_data_dict(examples)
         return dataset_dict
+
+    def __len__(self) -> int:
+        # 需要先调用 get_data_dict
+        return self.num_samples
 
     def read_examples_from_files(self, data_root: str, mode: str) -> List[InputExample]:
         file_path = os.path.join(data_root, "{}.txt".format(mode))
@@ -82,7 +87,7 @@ class THUCNewsDataset(CustomDataset):
                 guid_index += 1
         return examples
 
-    def get_dataset(self, examples: List[InputExample]) -> Dict[str, List]:
+    def convert_examples_to_data_dict(self, examples: List[InputExample]) -> Dict[str, List]:
         input_id_list = []
         input_mask_list = []
         label_list = []
@@ -101,6 +106,7 @@ class THUCNewsDataset(CustomDataset):
             input_mask_list.append(input_mask)
             label_list.append(self.label_map[example.label])
 
+        self.num_samples = len(input_id_list)
         data_dict = {
             "input_ids": input_id_list,
             "attention_mask": input_mask_list,
