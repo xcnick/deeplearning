@@ -5,28 +5,33 @@ import mindspore
 from mindspore import Tensor
 import torch
 import transformers
-from transformer.transformer.config import ConfigBase
+
+from transformer.builder import build_config, build_ms_models
+
 from transformer.transformer.bert_ms import (
-    MSBertForPreTraining,
     load_tf_weights_in_bert_to_ms,
     load_huggingface_weights_in_bert_to_ms,
 )
 import mindspore.context as context
 
 # context.set_context(mode=context.PYNATIVE_MODE, device_target="GPU")
-context.set_context(mode=context.GRAPH_MODE, device_target="CPU")
+context.set_context(mode=context.GRAPH_MODE, device_target="GPU")
 
 
 class TestBertModel:
     @classmethod
     def setup_class(cls):
-        cls.config_file_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
-        cls.tf_checkpoint_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_model.ckpt"
-        cls.huggingface_model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12"
-        cls.model_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/model_ms.ckpt"
-        cls.config = ConfigBase(cls.config_file_path)
-        cls.model_tf = MSBertForPreTraining(cls.config)
-        cls.model_hf = MSBertForPreTraining(cls.config)
+        cls.config_file_path = "/workspace/models/nlp/chinese_wwm_ext/bert_config.json"
+        cls.tf_checkpoint_path = "/workspace/models/nlp/chinese_wwm_ext/bert_model.ckpt"
+        cls.huggingface_model_path = "/workspace/models/nlp/chinese_wwm_ext"
+        cls.model_path = "/workspace/models/nlp/chinese_wwm_ext/bert_model_ms.ckpt"
+        model_cfg = dict(
+            type="MSBertForPreTraining",
+            config=dict(type="ConfigBase", json_file=cls.config_file_path),
+        )
+        cls.config = build_config(model_cfg["config"])
+        cls.model_tf = build_ms_models(model_cfg)
+        cls.model_hf = build_ms_models(model_cfg)
         cls.model_base = transformers.BertModel.from_pretrained(
             cls.huggingface_model_path, return_dict=True
         )
@@ -35,7 +40,8 @@ class TestBertModel:
             cls.huggingface_model_path, return_dict=True
         )
         cls.model_base_mlm.eval()
-        cls.model = MSBertForPreTraining.from_pretrained(cls.config, cls.model_path)
+        model_cfg.update({"model_path": cls.model_path})
+        cls.model = build_ms_models(model_cfg)
         cls.batch_size = 4
         cls.seq_length = 10
         cls.input_tokens = np.random.randint(
@@ -47,7 +53,7 @@ class TestBertModel:
         pass
 
     def test_config(self):
-        assert self.config.vocab_size == 30522
+        assert self.config.vocab_size == 21128
         assert self.config.hidden_size == 768
         assert self.config.num_hidden_layers == 12
         assert self.config.num_attention_heads == 12

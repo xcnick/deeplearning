@@ -6,12 +6,12 @@
   - Electra
   - GPT2
   - TTA
-- 使用PyTorch和TensorFlow2.0实现
+- 使用 PyTorch / TensorFlow2.0 / MindSpore 实现
 - 仅包含基本的模型实现，下游任务需自行定义网络模型
 
 ## 转换脚本
 
-支持从TensorFlow版本模型和Huggingface PyTorch版本模型转换为TensorFlow ckpt模型或PyTorch模型。
+支持从 TensorFlow 版本模型和 Huggingface PyTorch 版本模型转换为 TensorFlow ckpt 模型、PyTorch 模型、MindSpore 。
 
 ```
 python convert_weights.py --model_type bert \
@@ -24,7 +24,15 @@ python convert_weights.py --model_type bert \
 
 ## 示例代码
 
-在 `examples` 文件夹中。
+### 文本分类算法
 
-- 文本分类
-- NER
+以 TensorFlow 2 版本实现为例
+
+```bash
+# 将本项目加入 `PYTHONPATH`
+export PYTHONPATH=$PWD:${PYTHONPATH}
+
+# 使用 tools/train_tf.py 进行训练
+cd transformer/tools
+python train_tf.py --config=../configs/models/bert/seqcls.py --train_url=/workspace/outputs/thucnews/ --fp16
+```

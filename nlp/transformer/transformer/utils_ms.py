@@ -1,10 +1,14 @@
 import math
 import os
 import logging
+from typing import Tuple, Callable, Dict, Union, Any
 import mindspore
 import mindspore.nn as nn
 import mindspore.ops as ops
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
+
+from transformer import builder
+
 
 logger = logging.getLogger(__name__)
 
@@ -16,21 +20,23 @@ ACT2FN = {
 }
 
 
-def get_activation(activation_string):
+def get_activation(activation_string: str):
     return ACT2FN[activation_string]
 
 
 class MSPreTrainedModel(nn.Cell):
-    def __init__(self, config, **kwargs):
-        super().__init__()
+    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs) -> None:
+        super().__init__(**kwargs)
+        if isinstance(config, Dict):
+            config = builder.build_config(config)
         self.config = config
         self.weights_name = "model_ms.ckpt"
 
     @classmethod
-    def from_pretrained(cls, config, model_path, **kwargs):
+    def from_pretrained(
+        cls, config: Callable[..., None], model_path: str, **kwargs
+    ) -> "MSPreTrainedModel":
         model = cls(config, **kwargs)
-
-        # model(tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]], dtype=tf.int32))
 
         param_dict = load_checkpoint(model_path)
         load_param_into_net(model, param_dict)
@@ -112,7 +118,7 @@ class MSPreTrainedModel(nn.Cell):
 
         logger.info("Model weights saved in {}".format(output_model_file))
 
-    def get_extended_attention_mask(self, attention_mask, input_shape):
+    def get_extended_attention_mask(self, attention_mask):
         extended_attention_mask = None
         expand_dims = ops.ExpandDims()
         if attention_mask.ndim == 3:

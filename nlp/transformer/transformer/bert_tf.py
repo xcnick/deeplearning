@@ -42,7 +42,7 @@ class TFBertEmbeddings(tf.keras.layers.Layer):
         seq_length = input_shape[1]
 
         if token_type_ids is None:
-            token_type_ids = tf.ones(input_shape, dtype=tf.int32)
+            token_type_ids = tf.zeros(input_shape, dtype=tf.int32)
         if position_ids is None:
             position_ids = tf.range(seq_length, dtype=tf.int32)[tf.newaxis, :]
 
@@ -96,13 +96,9 @@ class TFBertModel(TFPreTrainedModel):
         attention_mask = inputs.get("attention_mask")
         token_type_ids = inputs.get("token_type_ids")
         position_ids = inputs.get("position_ids")
-        if input_ids is not None:
-            input_shape = tf.shape(input_ids)
-        else:
-            raise ValueError("You have to specify input_ids")
 
         if attention_mask is None:
-            attention_mask = tf.ones(input_shape)
+            attention_mask = tf.ones_like(input_ids)
 
         embeddings = self.embeddings(input_ids, token_type_ids, position_ids, training=training)
 
@@ -110,8 +106,10 @@ class TFBertModel(TFPreTrainedModel):
         extended_attention_mask = tf.cast(extended_attention_mask, dtype=embeddings.dtype)
         one_cst = tf.constant(1.0, dtype=embeddings.dtype)
         ten_thousand_cst = tf.constant(-10000.0, dtype=embeddings.dtype)
-        #extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        extended_attention_mask = tf.multiply(tf.subtract(one_cst, extended_attention_mask), ten_thousand_cst)
+        # extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        extended_attention_mask = tf.multiply(
+            tf.subtract(one_cst, extended_attention_mask), ten_thousand_cst
+        )
 
         encoder_output, attention_output = self.encoder(
             embeddings, extended_attention_mask, training=training
@@ -169,7 +167,10 @@ class TFBertOnlyMLMHead(tf.keras.layers.Layer):
 @TF_MODELS.register_module()
 class TFBertForPreTraining(TFPreTrainedModel):
     def __init__(
-        self, config: Union[Dict[str, Any], Callable[..., None]], model_path: Optional[str] = None, **kwargs
+        self,
+        config: Union[Dict[str, Any], Callable[..., None]],
+        model_path: Optional[str] = None,
+        **kwargs,
     ) -> None:
         super().__init__(config, **kwargs)
         self.bert = TFBertModel(self.config, **kwargs)

@@ -4,6 +4,8 @@ import mindspore
 import mindspore.nn as nn
 import mindspore.ops as ops
 from mindspore import Tensor
+from mindspore.common.initializer import TruncatedNormal
+
 from typing import Tuple, Optional
 
 from .utils_ms import get_activation
@@ -16,6 +18,7 @@ class Encoder(nn.Cell):
         d_model: int,
         nhead: int,
         d_feedforward: int,
+        initializer_range: float,
         attention_probs_dropout_prob: float,
         hidden_dropout_prob: float,
         hidden_act: str = "relu",
@@ -27,6 +30,7 @@ class Encoder(nn.Cell):
                     d_model,
                     nhead,
                     d_feedforward,
+                    initializer_range,
                     attention_probs_dropout_prob,
                     hidden_dropout_prob,
                     hidden_act,
@@ -48,14 +52,17 @@ class EncoderLayer(nn.Cell):
         d_model: int,
         nhead: int,
         d_feedforward: int = 2048,
+        initializer_range: float = 0.02,
         attention_probs_dropout_prob: float = 0.1,
         hidden_dropout_prob: float = 0.1,
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.self_attn = MultiHeadAttention(d_model, nhead, attention_probs_dropout_prob)
+        self.self_attn = MultiHeadAttention(
+            d_model, nhead, initializer_range, attention_probs_dropout_prob
+        )
         self.feed_forward = PositionwiseFeedForward(
-            d_model, d_feedforward, hidden_dropout_prob, hidden_act
+            d_model, d_feedforward, initializer_range, hidden_dropout_prob, hidden_act
         )
         self.add_norm = nn.CellList([AddNormLayer(d_model, hidden_dropout_prob) for _ in range(2)])
 
@@ -82,13 +89,18 @@ class PositionwiseFeedForward(nn.Cell):
         self,
         d_model: int,
         d_feedforward: int,
+        initializer_range: float = 0.02,
         hidden_dropout_prob: float = 0.1,
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
         self.hidden_act = hidden_act
-        self.intermediate = nn.Dense(d_model, d_feedforward)
-        self.output = nn.Dense(d_feedforward, d_model)
+        self.intermediate = nn.Dense(
+            d_model, d_feedforward, weight_init=TruncatedNormal(initializer_range)
+        )
+        self.output = nn.Dense(
+            d_feedforward, d_model, weight_init=TruncatedNormal(initializer_range)
+        )
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def construct(self, x: Tensor) -> Tensor:
@@ -97,19 +109,23 @@ class PositionwiseFeedForward(nn.Cell):
 
 class MultiHeadAttention(nn.Cell):
     def __init__(
-        self, d_model: int = 512, n_head: int = 8, attention_probs_dropout_prob: float = 0.1
+        self,
+        d_model: int = 512,
+        n_head: int = 8,
+        initializer_range: float = 0.02,
+        attention_probs_dropout_prob: float = 0.1,
     ) -> None:
         super().__init__()
 
         self.d_model = d_model
         self.d_per_head = d_model // n_head
         self.n_head = n_head
-        self.query = nn.Dense(d_model, d_model)
-        self.key = nn.Dense(d_model, d_model)
-        self.value = nn.Dense(d_model, d_model)
+        self.query = nn.Dense(d_model, d_model, weight_init=TruncatedNormal(initializer_range))
+        self.key = nn.Dense(d_model, d_model, weight_init=TruncatedNormal(initializer_range))
+        self.value = nn.Dense(d_model, d_model, weight_init=TruncatedNormal(initializer_range))
 
         self.attention = ScaledDotProductAttention(self.d_per_head, attention_probs_dropout_prob)
-        self.dense = nn.Dense(d_model, d_model)
+        self.dense = nn.Dense(d_model, d_model, weight_init=TruncatedNormal(initializer_range))
 
     def construct(
         self, query: Tensor, key: Tensor, value: Tensor, mask: Optional[Tensor] = None
@@ -121,7 +137,7 @@ class MultiHeadAttention(nn.Cell):
         value = self.value(value)
 
         # multi head
-        query = query.view(batch_size, -1, self.n_head, self.d_per_head).swapaxes(1, 2)
+        query = query.view(batch_size, -1, self.n_head, self.d_per_head).transpose(0, 2, 1, 3)
         key = key.view(batch_size, -1, self.n_head, self.d_per_head).transpose(0, 2, 1, 3)
         value = value.view(batch_size, -1, self.n_head, self.d_per_head).transpose(0, 2, 1, 3)
 

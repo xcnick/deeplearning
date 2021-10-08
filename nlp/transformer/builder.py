@@ -1,4 +1,4 @@
-from .utils.file_utils import is_torch_available, is_tf_available
+from .utils.file_utils import is_ms_available, is_torch_available, is_tf_available
 
 from transformer.utils.registry import Registry, build_from_cfg
 
@@ -26,26 +26,20 @@ if is_tf_available():
     TF_TRANSFORMS = Registry("tf_transform")
     TF_PIPELINES = Registry("tf_pipeline")
 
-
     def build_tf_pipelines(cfg, default_args=None):
         return build_from_cfg(cfg, registry=TF_PIPELINES, default_args=default_args)
-
 
     def build_tf_transforms(cfg, default_args=None):
         return build_from_cfg(cfg, registry=TF_TRANSFORMS, default_args=default_args)
 
-
     def build_tf_models(cfg, default_args=None):
         return build_from_cfg(cfg, registry=TF_MODELS, default_args=default_args)
-
 
     def build_tf_callbacks(cfg, default_args=None):
         return build_from_cfg(cfg, registry=TF_CALLBACKS, default_args=default_args)
 
-
     import tensorflow as tf
     import inspect
-
 
     def register_tf_optimizers():
         tf_optimizers = []
@@ -58,8 +52,14 @@ if is_tf_available():
                 tf_optimizers.append(module_name)
         return tf_optimizers
 
-
     def build_tf_optimizers(cfg, default_args=None):
         if len(TF_OPTIMIZERS) == 0:
             register_tf_optimizers()
         return build_from_cfg(cfg, registry=TF_OPTIMIZERS, default_args=default_args)
+
+
+if is_ms_available():
+    MS_MODELS = Registry("ms_models")
+
+    def build_ms_models(cfg, default_args=None):
+        return build_from_cfg(cfg, registry=MS_MODELS, default_args=default_args)

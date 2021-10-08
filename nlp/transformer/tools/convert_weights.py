@@ -5,49 +5,46 @@ import torch
 import tensorflow as tf
 import mindspore
 
-from transformer.bert import (
-    BertConfig,
+
+from transformer.transformer.bert import (
     BertForPreTraining,
     load_tf_weights_in_bert,
     load_huggingface_weights_in_bert,
 )
-from transformer.albert import (
-    AlbertConfig,
+from transformer.transformer.albert import (
     AlbertForPreTraining,
     load_tf_weights_in_albert,
     load_huggingface_weights_in_albert,
 )
-from transformer.electra import (
-    ElectraConfig,
+from transformer.transformer.electra import (
     ElectraForPreTraining,
     load_tf_weights_in_electra,
     load_huggingface_weights_in_electra,
 )
-from transformer.gpt2 import GPT2Config, GPT2Model, load_tf_weights_in_gpt2
-
-from transformer.bert_tf import (
+from transformer.transformer.gpt2 import GPT2Model, load_tf_weights_in_gpt2
+from transformer.transformer.bert_tf import (
     TFBertForPreTraining,
     load_tf_weights_in_bert_to_tf,
     load_huggingface_weights_in_bert_to_tf,
 )
-
-from transformer.bert_ms import (
+from transformer.transformer.bert_ms import (
     MSBertForPreTraining,
     load_tf_weights_in_bert_to_ms,
     load_huggingface_weights_in_bert_to_ms,
 )
+from transformer.transformer import ConfigBase
 
 logging.basicConfig(level=logging.INFO)
 
 MODEL_CLASSES = {
     "pt": {
-        "bert": (BertConfig, BertForPreTraining),
-        "albert": (AlbertConfig, AlbertForPreTraining),
-        "electra": (ElectraConfig, ElectraForPreTraining),
-        "gpt2": (GPT2Config, GPT2Model),
+        "bert": BertForPreTraining,
+        "albert": AlbertForPreTraining,
+        "electra": ElectraForPreTraining,
+        "gpt2": GPT2Model,
     },
-    "tf": {"bert": (BertConfig, TFBertForPreTraining)},
-    "ms": {"bert": (BertConfig, MSBertForPreTraining)},
+    "tf": {"bert": TFBertForPreTraining},
+    "ms": {"bert": MSBertForPreTraining},
 }
 
 LOAD_WEIGHTS_MAPS = {
@@ -66,9 +63,16 @@ LOAD_WEIGHTS_MAPS = {
 }
 
 
-def convert_weights(model_type, from_model, from_path, config_path, to_model, dump_path):
-    config_class, model_class = MODEL_CLASSES[to_model][model_type]
-    config = config_class.from_json_file(config_path)
+def convert_weights(
+    model_type: str,
+    from_model: str,
+    from_path: str,
+    config_path: str,
+    to_model: str,
+    dump_path: str,
+):
+    model_class = MODEL_CLASSES[to_model][model_type]
+    config = ConfigBase(config_path)
     model = model_class(config)
     load_weights_fct = LOAD_WEIGHTS_MAPS[to_model][model_type][from_model]
     if to_model == "tf":

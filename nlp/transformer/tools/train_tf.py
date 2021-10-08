@@ -116,11 +116,18 @@ def main():
     train_dataset_obj = build_datasets(cfg.dict["data"]["train"])
     val_dataset_obj = build_datasets(cfg.dict["data"]["val"])
 
-    train_dataset = train_dataset_obj.get_data_dict()
-    val_dataset = val_dataset_obj.get_data_dict()
+    if cfg.dict["dataset_type"] == "TFRecordDataset":
+        train_dataset = train_dataset_obj()
+        val_dataset = val_dataset_obj()
 
-    num_train_samples = len(train_dataset_obj)
-    num_val_samples = len(val_dataset_obj)
+        num_train_samples = cfg.dict["data"]["num_train_samples"]
+        num_val_samples = cfg.dict["data"]["num_val_samples"]
+    else:
+        train_dataset = train_dataset_obj.get_data_dict()
+        val_dataset = val_dataset_obj.get_data_dict()
+
+        num_train_samples = len(train_dataset_obj)
+        num_val_samples = len(val_dataset_obj)
 
     _adjust_batchsize(
         cfg,

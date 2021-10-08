@@ -1,36 +1,41 @@
+from typing import Optional, Callable, Dict, Union, Any, Tuple
+
+import numpy as np
 import mindspore
 import mindspore.nn as nn
 import mindspore.ops as ops
-
-import numpy as np
 from mindspore import Tensor
+from mindspore.train.serialization import load_checkpoint, load_param_into_net
+from mindspore.common.initializer import TruncatedNormal
 
 from .transformer_ms import Encoder
-from .config import ConfigBase
 from .utils_ms import MSPreTrainedModel, get_activation
-from typing import Tuple, Optional, Callable
+
+from transformer.builder import MS_MODELS
 
 
 class MSBertEmbeddings(nn.Cell):
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
-        self.token_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=0)
-        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
-        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.token_embeddings = nn.Embedding(
+            config.vocab_size,
+            config.hidden_size,
+            embedding_table=TruncatedNormal(config.initializer_range),
+            padding_idx=0,
+        )
+        self.position_embeddings = nn.Embedding(
+            config.max_position_embeddings,
+            config.hidden_size,
+            embedding_table=TruncatedNormal(config.initializer_range),
+        )
+        self.token_type_embeddings = nn.Embedding(
+            config.type_vocab_size,
+            config.hidden_size,
+            embedding_table=TruncatedNormal(config.initializer_range),
+        )
 
         self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=1e-12)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-
-        self.position_ids = Tensor(
-            np.arange(config.max_position_embeddings)
-            .reshape(-1, config.max_position_embeddings)
-            .astype(np.int32)
-        )
-        self.token_type_ids = Tensor(
-            np.zeros(config.max_position_embeddings)
-            .reshape(-1, config.max_position_embeddings)
-            .astype(np.int32)
-        )
 
     def construct(
         self,
@@ -42,9 +47,9 @@ class MSBertEmbeddings(nn.Cell):
         seq_length = input_shape[1]
 
         if token_type_ids is None:
-            token_type_ids = self.token_type_ids[:, :seq_length]
+            token_type_ids = ops.zeros_like(input_ids)
         if position_ids is None:
-            position_ids = self.position_ids[:, :seq_length]
+            position_ids = ops.ExpandDims()(nn.Range(0, seq_length)(), 0)
 
         input_embeddings = self.token_embeddings(input_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
@@ -60,7 +65,11 @@ class MSBertEmbeddings(nn.Cell):
 class MSBertPooler(nn.Cell):
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
-        self.dense = nn.Dense(config.hidden_size, config.hidden_size)
+        self.dense = nn.Dense(
+            config.hidden_size,
+            config.hidden_size,
+            weight_init=TruncatedNormal(config.initializer_range),
+        )
         self.activation = nn.Tanh()
 
     def construct(self, hidden_states: Tensor) -> Tensor:
@@ -70,20 +79,22 @@ class MSBertPooler(nn.Cell):
         return pooled_output
 
 
+@MS_MODELS.register_module()
 class MSBertModel(MSPreTrainedModel):
-    def __init__(self, config: Callable[..., None], **kwargs) -> None:
+    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs) -> None:
         super().__init__(config, **kwargs)
-        self.embeddings = MSBertEmbeddings(config)
+        self.embeddings = MSBertEmbeddings(self.config)
         self.encoder = Encoder(
             config.num_hidden_layers,
             config.hidden_size,
             config.num_attention_heads,
             config.intermediate_size,
+            config.initializer_range,
             config.attention_probs_dropout_prob,
             config.hidden_dropout_prob,
             config.hidden_act,
         )
-        self.pooler = MSBertPooler(config)
+        self.pooler = MSBertPooler(self.config)
 
     def construct(
         self,
@@ -92,13 +103,9 @@ class MSBertModel(MSPreTrainedModel):
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
     ) -> Tuple[Tensor, ...]:
-        input_shape = None
-        if input_ids is not None:
-            input_shape = input_ids.shape
-
         if attention_mask is None:
-            attention_mask = ops.Ones()(input_shape, mindspore.int32)
-        extended_attention_mask = self.get_extended_attention_mask(attention_mask, input_shape)
+            attention_mask = ops.ones_like(input_ids)
+        extended_attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embeddings = self.embeddings(input_ids, token_type_ids, position_ids)
 
@@ -115,7 +122,11 @@ class MSBertModel(MSPreTrainedModel):
 class MSBertPredictionHeadTransform(nn.Cell):
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
-        self.dense = nn.Dense(config.hidden_size, config.hidden_size)
+        self.dense = nn.Dense(
+            config.hidden_size,
+            config.hidden_size,
+            weight_init=TruncatedNormal(config.initializer_range),
+        )
         self.transform_act_fn = get_activation(config.hidden_act)
         self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=1e-12)
 
@@ -130,7 +141,11 @@ class MSBertLMPredictionHead(nn.Cell):
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.transform = MSBertPredictionHeadTransform(config)
-        self.decoder = nn.Dense(config.hidden_size, config.vocab_size)
+        self.decoder = nn.Dense(
+            config.hidden_size,
+            config.vocab_size,
+            weight_init=TruncatedNormal(config.initializer_range),
+        )
 
     def construct(self, hidden_states: Tensor) -> Tensor:
         hidden_states = self.transform(hidden_states)
@@ -148,11 +163,19 @@ class MSBertOnlyMLMHead(nn.Cell):
         return prediction_scores
 
 
+@MS_MODELS.register_module()
 class MSBertForPreTraining(MSPreTrainedModel):
-    def __init__(self, config: Callable[..., None], **kwargs) -> None:
+    def __init__(
+        self,
+        config: Union[Dict[str, Any], Callable[..., None]],
+        model_path: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         super().__init__(config, **kwargs)
-        self.bert = MSBertModel(config)
-        self.cls = MSBertOnlyMLMHead(config)
+        self.bert = MSBertModel(self.config)
+        self.cls = MSBertOnlyMLMHead(self.config)
+        if model_path is not None:
+            self._load_weights(model_path)
 
     def construct(
         self,
@@ -174,6 +197,10 @@ class MSBertForPreTraining(MSPreTrainedModel):
         outputs = outputs + (prediction_scores,)
 
         return outputs
+
+    def _load_weights(self, model_path: str = None) -> None:
+        param_dict = load_checkpoint(model_path)
+        load_param_into_net(self, param_dict)
 
 
 def load_tf_weights_in_bert_to_ms(
