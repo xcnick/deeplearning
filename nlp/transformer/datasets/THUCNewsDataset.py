@@ -64,15 +64,15 @@ class THUCNewsDataset(CustomDataset):
         self.tokenizer = builder.build_tokenizers(tokenizer_cfg)
 
     def get_data_dict(self) -> Dict[str, List]:
-        examples = self.read_examples_from_files(self.data_root, self.mode)
-        dataset_dict = self.convert_examples_to_data_dict(examples)
+        examples = self.read_data_from_files(self.data_root, self.mode)
+        dataset_dict = self.convert_data_to_dict(examples)
         return dataset_dict
 
     def __len__(self) -> int:
         # 需要先调用 get_data_dict
         return self.num_samples
 
-    def read_examples_from_files(self, data_root: str, mode: str) -> List[InputExample]:
+    def read_data_from_files(self, data_root: str, mode: str) -> List[InputExample]:
         file_path = os.path.join(data_root, "{}.txt".format(mode))
         guid_index = 1
         examples = []
@@ -87,7 +87,7 @@ class THUCNewsDataset(CustomDataset):
                 guid_index += 1
         return examples
 
-    def convert_examples_to_data_dict(self, examples: List[InputExample]) -> Dict[str, List]:
+    def convert_data_to_dict(self, examples: List[InputExample]) -> Dict[str, List]:
         input_id_list = []
         input_mask_list = []
         label_list = []

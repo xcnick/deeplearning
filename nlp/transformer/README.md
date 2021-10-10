@@ -34,5 +34,5 @@ export PYTHONPATH=$PWD:${PYTHONPATH}
 
 # 使用 tools/train_tf.py 进行训练
 cd transformer/tools
-python train_tf.py --config=../configs/models/bert/seqcls.py --train_url=/workspace/outputs/thucnews/ --fp16
+python train_tf.py --config=../configs/models/bert/thuc_news.py --train_url=/workspace/outputs/thucnews/ --fp16
 ```

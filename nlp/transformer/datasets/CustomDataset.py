@@ -11,9 +11,9 @@ class CustomDataset(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def read_examples_from_files(self, data_root: str, mode: str) -> List[Any]:
+    def read_data_from_files(self, data_root: str, mode: str):
         pass
 
     @abstractmethod
-    def convert_examples_to_data_dict(self, examples: List[Any]):
+    def convert_data_to_dict(self, data):
         pass
