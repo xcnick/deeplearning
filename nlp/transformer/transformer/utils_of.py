@@ -1,9 +1,9 @@
 import math
 import os
 import logging
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import oneflow as flow
+import oneflow.nn as nn
+import oneflow.nn.functional as F
 from typing import Union, Tuple, Optional, Callable, Dict, Any
 
 from transformer import builder
@@ -11,43 +11,19 @@ from transformer import builder
 logger = logging.getLogger(__name__)
 
 
-def swish(x: torch.Tensor) -> torch.Tensor:
-    return x * torch.sigmoid(x)
+def swish(x: flow.Tensor) -> flow.Tensor:
+    return x * flow.sigmoid(x)
 
-
-def _gelu_python(x: torch.Tensor) -> torch.Tensor:
-    """ Original Implementation of the gelu activation function in Google Bert repo when initially created.
-        For information: OpenAI GPT's gelu is slightly different (and gives slightly different results):
-        0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
-        This is now written in C in torch.nn.functional
-        Also see https://arxiv.org/abs/1606.08415
-    """
-    return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
-
-
-def gelu_new(x: torch.Tensor) -> torch.Tensor:
-    """ Implementation of the gelu activation function currently in Google Bert repo (identical to OpenAI GPT).
-        Also see https://arxiv.org/abs/1606.08415
-    """
-    return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
-
-
-if torch.__version__ < "1.4.0":
-    gelu = _gelu_python
-else:
-    gelu = F.gelu
-    gelu_new = torch.jit.script(gelu_new)
 
 ACT2FN = {
     "relu": F.relu,
     "swish": swish,
-    "gelu": gelu,
+    "gelu": F.gelu,
     "tanh": F.tanh,
-    "gelu_new": gelu_new,
 }
 
 
-def get_activation(activation_string: str) -> Callable[[torch.Tensor], Any]:
+def get_activation(activation_string: str) -> Callable[[flow.Tensor], Any]:
     if activation_string in ACT2FN:
         return ACT2FN[activation_string]
     else:
@@ -58,20 +34,19 @@ def get_activation(activation_string: str) -> Callable[[torch.Tensor], Any]:
         )
 
 
-class PreTrainedModel(nn.Module):
+class OFPreTrainedModel(nn.Module):
     def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs):
         super().__init__()
         if isinstance(config, Dict):
             config = builder.build_config(config)
         self.config = config
-        self.weights_name = "model_pt.bin"
 
     @classmethod
     def from_pretrained(
         cls, config: Callable[..., None], model_path: str, **kwargs
-    ) -> "PreTrainedModel":
+    ) -> "OFPreTrainedModel":
         model = cls(config, **kwargs)
-        if not os.path.isfile(model_path):
+        if not os.path.isdir(model_path):
             raise f"Error no file named {model_path} found"
 
         # state_dict = torch.load(model_path, map_location="cpu")
@@ -112,9 +87,7 @@ class PreTrainedModel(nn.Module):
 
         #     missing_keys.extend(head_model_state_dict_without_base_prefix - base_model_state_dict)
 
-        missing_keys, unexpected_keys = model.load_state_dict(
-            torch.load(model_path, map_location="cpu"), strict=False
-        )
+        missing_keys, unexpected_keys = model.load_state_dict(flow.load(model_path), strict=False)
         if len(missing_keys) > 0:
             logger.info(
                 "Weights of {} not initialized from pretrained model: {}".format(
@@ -146,18 +119,18 @@ class PreTrainedModel(nn.Module):
         model_to_save = self.module if hasattr(self, "module") else self
 
         # If we save using the predefined names, we can load using `from_pretrained`
-        output_model_file = os.path.join(save_directory, self.weights_name)
+        # output_model_file = os.path.join(save_directory, self.weights_name)
 
-        torch.save(model_to_save.state_dict(), output_model_file)
+        flow.save(model_to_save.state_dict(), save_directory)
 
-        logger.info("Model weights saved in {}".format(output_model_file))
+        logger.info("Model weights saved in {}".format(save_directory))
 
     def get_extended_attention_mask(
         self,
-        attention_mask: torch.Tensor,
-        input_ids: torch.Tensor,
-        device: Optional[Union[int, torch.device]] = None,
-    ) -> torch.Tensor:
+        attention_mask: flow.Tensor,
+        input_ids: flow.Tensor,
+        device: Optional[Union[int, flow.device]] = None,
+    ):
         if attention_mask.dim() == 3:
             extended_attention_mask = attention_mask[:, None, :, :]
         elif attention_mask.dim() == 2:

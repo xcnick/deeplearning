@@ -4,7 +4,7 @@ import logging
 import torch
 import tensorflow as tf
 import mindspore
-
+import oneflow as flow
 
 from transformer.transformer.bert import (
     BertForPreTraining,
@@ -32,6 +32,11 @@ from transformer.transformer.bert_ms import (
     load_tf_weights_in_bert_to_ms,
     load_huggingface_weights_in_bert_to_ms,
 )
+from transformer.transformer.bert_of import (
+    OFBertForPreTraining,
+    load_tf_weights_in_bert,
+    load_huggingface_weights_in_bert,
+)
 from transformer.transformer import ConfigBase
 
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +50,7 @@ MODEL_CLASSES = {
     },
     "tf": {"bert": TFBertForPreTraining},
     "ms": {"bert": MSBertForPreTraining},
+    "of": {"bert": OFBertForPreTraining},
 }
 
 LOAD_WEIGHTS_MAPS = {
@@ -60,6 +66,7 @@ LOAD_WEIGHTS_MAPS = {
     "ms": {
         "bert": {"tf": load_tf_weights_in_bert_to_ms, "hf": load_huggingface_weights_in_bert_to_ms}
     },
+    "of": {"bert": {"tf": load_tf_weights_in_bert, "hf": load_huggingface_weights_in_bert}},
 }
 
 
@@ -84,8 +91,10 @@ def convert_weights(
         torch.save(model.state_dict(), dump_path)
     elif to_model == "tf":
         model.save_weights(dump_path)
-    else:
+    elif to_model == "ms":
         mindspore.save_checkpoint(model, dump_path)
+    elif to_model == "of":
+        flow.save(model.state_dict(), dump_path)
     print("Save {} model to {}".format(to_model, dump_path))
 
 
@@ -116,8 +125,8 @@ if __name__ == "__main__":
         "--to_model",
         type=str,
         required=True,
-        choices=("tf", "pt", "ms"),
-        help="To model : tf / pt / ms",
+        choices=("tf", "pt", "ms", "of"),
+        help="To model : tensorflow / pytorch / mindspore / oneflow",
     )
     parser.add_argument(
         "--dump_path", default=None, type=str, required=True, help="Output model file path"
