@@ -1,11 +1,11 @@
 import pytest
 
 import numpy as np
-import oneflow as flow
+import paddle
 import torch
 import transformers
-from transformer.builder import build_config, build_of_models
-from transformer.transformer.bert_of import (
+from transformer.builder import build_config, build_pd_models
+from transformer.transformer.bert_pd import (
     load_tf_weights_in_bert,
     load_huggingface_weights_in_bert,
 )
@@ -17,14 +17,14 @@ class TestBertModel:
         cls.config_file_path = "/workspace/models/nlp/chinese_wwm_ext/bert_config.json"
         cls.tf_checkpoint_path = "/workspace/models/nlp/chinese_wwm_ext/bert_model.ckpt"
         cls.huggingface_model_path = "/workspace/models/nlp/chinese_wwm_ext"
-        cls.model_path = "/workspace/models/nlp/chinese_wwm_ext/oneflow"
+        cls.model_path = "/workspace/models/nlp/chinese_wwm_ext/bert_model_pd.bin"
         model_cfg = dict(
-            type="OFBertForPreTraining",
+            type="PDBertForPreTraining",
             config=dict(type="ConfigBase", json_file=cls.config_file_path),
         )
         cls.config = build_config(model_cfg["config"])
-        cls.model_tf = build_of_models(model_cfg)
-        cls.model_hf = build_of_models(model_cfg)
+        cls.model_tf = build_pd_models(model_cfg)
+        cls.model_hf = build_pd_models(model_cfg)
         cls.model_base = transformers.BertModel.from_pretrained(cls.huggingface_model_path)
         cls.model_base.eval()
         cls.model_base_mlm = transformers.BertForPreTraining.from_pretrained(
@@ -32,22 +32,25 @@ class TestBertModel:
         )
         cls.model_base_mlm.eval()
         model_cfg.update({"model_path": cls.model_path})
-        cls.model = build_of_models(model_cfg)
+        cls.model = build_pd_models(model_cfg)
         cls.model.eval()
         cls.batch_size = 4
         cls.seq_length = 10
         cls.tokens_tensor = {
-            "input_ids": flow.randint(
-                low=1, high=100, size=(cls.batch_size, cls.seq_length), dtype=flow.long
+            "input_ids": paddle.randint(
+                low=1, high=100, shape=(cls.batch_size, cls.seq_length), dtype=paddle.int64
             ),
-            "attention_mask": flow.randint(
-                low=0, high=2, size=(cls.batch_size, cls.seq_length), dtype=flow.long
+            "attention_mask": paddle.randint(
+                low=0, high=2, shape=(cls.batch_size, cls.seq_length), dtype=paddle.int64
             ),
-            "token_type_ids": flow.randint(
-                low=0, high=2, size=(cls.batch_size, cls.seq_length), dtype=flow.long
+            "token_type_ids": paddle.randint(
+                low=0, high=2, shape=(cls.batch_size, cls.seq_length), dtype=paddle.int64
             ),
-            "position_ids": flow.randint(
-                low=0, high=cls.seq_length, size=(cls.batch_size, cls.seq_length), dtype=flow.long
+            "position_ids": paddle.randint(
+                low=0,
+                high=cls.seq_length,
+                shape=(cls.batch_size, cls.seq_length),
+                dtype=paddle.int64,
             ),
         }
 
@@ -73,22 +76,25 @@ class TestBertModel:
         encoder_output = output_dict["encoder_output"]
         pooled_output = output_dict["pooled_output"]
         prediction_scores = output_dict["prediction_scores"]
-        assert encoder_output.shape == (self.batch_size, self.seq_length, self.config.hidden_size)
-        assert pooled_output.shape == (self.batch_size, self.config.hidden_size)
-        assert prediction_scores.shape == (self.batch_size, self.seq_length, self.config.vocab_size)
+        assert encoder_output.shape == [self.batch_size, self.seq_length, self.config.hidden_size]
+        assert pooled_output.shape == [self.batch_size, self.config.hidden_size]
+        assert prediction_scores.shape == [self.batch_size, self.seq_length, self.config.vocab_size]
 
     def test_tf_and_huggingface_compare(self):
         load_tf_weights_in_bert(self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
-        self.model_tf.eval()
 
         load_huggingface_weights_in_bert(
             self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
         )
-        self.model_hf.eval()
 
-        for key in self.model_tf.state_dict():
-            assert np.array_equal(
-                self.model_tf.state_dict()[key].numpy(), self.model_hf.state_dict()[key].numpy()
+        for tf_param, hf_param in zip(self.model_tf.state_dict(), self.model_hf.state_dict()):
+            assert paddle.equal_all(
+                self.model_tf.state_dict()[tf_param], self.model_hf.state_dict()[hf_param]
+            )
+
+        for tf_param, pt_param in zip(self.model_hf.state_dict(), self.model.state_dict()):
+            assert paddle.equal_all(
+                self.model_hf.state_dict()[tf_param], self.model.state_dict()[pt_param]
             )
 
     def test_model_forward(self):

@@ -1,6 +1,12 @@
 __version__ = "0.0.1"
 
-from ..utils.file_utils import is_tf_available, is_torch_available, is_ms_available, is_of_available
+from ..utils.file_utils import (
+    is_tf_available,
+    is_torch_available,
+    is_ms_available,
+    is_of_available,
+    is_paddle_available,
+)
 
 from .config import ConfigBase
 from .tokenizer import Tokenizer
@@ -16,3 +22,6 @@ if is_ms_available():
 
 if is_of_available():
     from .bert_of import OFBertModel, OFBertForPreTraining
+
+if is_paddle_available():
+    from .bert_pd import PDBertModel, PDBertForPreTraining

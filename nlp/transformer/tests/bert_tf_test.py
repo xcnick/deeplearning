@@ -29,12 +29,10 @@ class TestTFBertModel:
         cls.config = build_config(model_cfg["config"])
         cls.model_tf = build_tf_models(model_cfg)
         cls.model_hf = build_tf_models(model_cfg)
-        cls.model_base = transformers.BertModel.from_pretrained(
-            cls.huggingface_model_path, return_dict=True
-        )
+        cls.model_base = transformers.BertModel.from_pretrained(cls.huggingface_model_path)
         cls.model_base.eval()
         cls.model_base_mlm = transformers.BertForPreTraining.from_pretrained(
-            cls.huggingface_model_path, return_dict=True
+            cls.huggingface_model_path
         )
         cls.model_base_mlm.eval()
         model_cfg.update({"model_path": cls.model_path})
@@ -43,8 +41,8 @@ class TestTFBertModel:
         cls.seq_length = 10
         cls.tokens_tensor = {
             "input_ids": tf.random.uniform(shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
-            "attention_mask": tf.random.uniform(shape=(4, 10), minval=0, maxval=1, dtype=tf.int32),
-            "token_type_ids": tf.random.uniform(shape=(4, 10), minval=0, maxval=1, dtype=tf.int32),
+            "attention_mask": tf.random.uniform(shape=(4, 10), minval=0, maxval=2, dtype=tf.int32),
+            "token_type_ids": tf.random.uniform(shape=(4, 10), minval=0, maxval=2, dtype=tf.int32),
             "position_ids": tf.random.uniform(shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
         }
 
@@ -125,12 +123,14 @@ class TestTFBertModel:
             torch.tensor(self.tokens_tensor["attention_mask"].numpy(), dtype=torch.long),
             torch.tensor(self.tokens_tensor["token_type_ids"].numpy(), dtype=torch.long),
             torch.tensor(self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
+            return_dict=True,
         )
         base_mlm_output = self.model_base_mlm(
             torch.tensor(self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
             torch.tensor(self.tokens_tensor["attention_mask"].numpy(), dtype=torch.long),
             torch.tensor(self.tokens_tensor["token_type_ids"].numpy(), dtype=torch.long),
             torch.tensor(self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
+            return_dict=True,
         )
 
         last_hidden_state = base_output["last_hidden_state"].detach().numpy()

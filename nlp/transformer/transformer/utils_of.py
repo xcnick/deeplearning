@@ -129,7 +129,6 @@ class OFPreTrainedModel(nn.Module):
         self,
         attention_mask: flow.Tensor,
         input_ids: flow.Tensor,
-        device: Optional[Union[int, flow.device]] = None,
     ):
         if attention_mask.dim() == 3:
             extended_attention_mask = attention_mask[:, None, :, :]

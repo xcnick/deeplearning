@@ -1,4 +1,10 @@
-from .utils.file_utils import is_ms_available, is_torch_available, is_tf_available, is_of_available
+from .utils.file_utils import (
+    is_ms_available,
+    is_torch_available,
+    is_tf_available,
+    is_of_available,
+    is_paddle_available,
+)
 
 from transformer.utils.registry import Registry, build_from_cfg
 
@@ -77,3 +83,10 @@ if is_of_available():
 
     def build_of_models(cfg, default_args=None):
         return build_from_cfg(cfg, registry=OF_MODELS, default_args=default_args)
+
+
+if is_paddle_available():
+    PD_MODELS = Registry("pd_models")
+
+    def build_pd_models(cfg, default_args=None):
+        return build_from_cfg(cfg, registry=PD_MODELS, default_args=default_args)

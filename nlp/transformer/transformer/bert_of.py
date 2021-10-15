@@ -7,6 +7,7 @@ from .utils_of import OFPreTrainedModel, get_activation
 
 from transformer.builder import OF_MODELS
 
+
 class OFBertEmbeddings(nn.Module):
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
@@ -14,7 +15,7 @@ class OFBertEmbeddings(nn.Module):
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
-        self.layer_norm = nn.LayerNorm(config.hidden_size, eps=1e-12)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=1e-12)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(
@@ -82,9 +83,7 @@ class OFBertModel(OFPreTrainedModel):
 
         if attention_mask is None:
             attention_mask = flow.ones_like(input_ids, device=input_ids.device)
-        extended_attention_mask = self.get_extended_attention_mask(
-            attention_mask, input_ids, device=input_ids.device
-        )
+        extended_attention_mask = self.get_extended_attention_mask(attention_mask, input_ids)
 
         encoder_output, attention_output = self.encoder(embeddings, extended_attention_mask)
         pooled_output = self.pooler(encoder_output)
@@ -98,7 +97,7 @@ class OFBertPredictionHeadTransform(nn.Module):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.transform_act_fn = get_activation(config.hidden_act)
-        self.layer_norm = nn.LayerNorm(config.hidden_size, eps=1e-12)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=1e-12)
 
     def forward(self, hidden_states: flow.Tensor) -> flow.Tensor:
         hidden_states = self.dense(hidden_states)

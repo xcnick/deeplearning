@@ -2,7 +2,6 @@ import math
 
 import torch
 import torch.nn as nn
-from torch import Tensor
 from typing import Tuple, Optional
 
 from .utils import get_activation
@@ -12,9 +11,9 @@ class Encoder(nn.Module):
     def __init__(
         self,
         num_hidden_layers: int,
-        d_model: int,
-        nhead: int,
-        d_feedforward: int,
+        hidden_size: int,
+        num_attention_heads: int,
+        intermediate_size: int,
         attention_probs_dropout_prob: float,
         hidden_dropout_prob: float,
         hidden_act: str = "relu",
@@ -23,9 +22,9 @@ class Encoder(nn.Module):
         self.layers = nn.ModuleList(
             [
                 EncoderLayer(
-                    d_model,
-                    nhead,
-                    d_feedforward,
+                    hidden_size,
+                    num_attention_heads,
+                    intermediate_size,
                     attention_probs_dropout_prob,
                     hidden_dropout_prob,
                     hidden_act,
@@ -34,7 +33,9 @@ class Encoder(nn.Module):
             ]
         )
 
-    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         for layer in self.layers:
             x, attn = layer(x, mask)
         return x, attn
@@ -43,23 +44,27 @@ class Encoder(nn.Module):
 class EncoderLayer(nn.Module):
     def __init__(
         self,
-        d_model: int,
-        nhead: int,
-        d_feedforward: int = 2048,
+        hidden_size: int,
+        num_attention_heads: int,
+        intermediate_size: int = 3072,
         attention_probs_dropout_prob: float = 0.1,
         hidden_dropout_prob: float = 0.1,
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.self = MultiHeadAttention(d_model, nhead, attention_probs_dropout_prob)
+        self.self = MultiHeadAttention(
+            hidden_size, num_attention_heads, attention_probs_dropout_prob
+        )
         self.feed_forward = PositionwiseFeedForward(
-            d_model, d_feedforward, hidden_dropout_prob, hidden_act
+            hidden_size, intermediate_size, hidden_dropout_prob, hidden_act
         )
         self.add_norm = nn.ModuleList(
-            [AddNormLayer(d_model, hidden_dropout_prob) for _ in range(2)]
+            [AddNormLayer(hidden_size, hidden_dropout_prob) for _ in range(2)]
         )
 
-    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         x1, attn = self.self(x, x, x, mask)
         x = self.add_norm[0](x, x1)
         x1 = self.feed_forward(x)
@@ -68,52 +73,59 @@ class EncoderLayer(nn.Module):
 
 
 class AddNormLayer(nn.Module):
-    def __init__(self, d_model: int, hidden_dropout_prob: float = 0.1) -> None:
+    def __init__(self, hidden_size: int, hidden_dropout_prob: float = 0.1) -> None:
         super().__init__()
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-12)
+        self.layer_norm = nn.LayerNorm(hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, x: Tensor, x1: Tensor) -> Tensor:
+    def forward(self, x: torch.Tensor, x1: torch.Tensor) -> torch.Tensor:
         return self.layer_norm(x + self.dropout(x1))
 
 
 class PositionwiseFeedForward(nn.Module):
     def __init__(
         self,
-        d_model: int,
-        d_feedforward: int,
+        hidden_size: int,
+        intermediate_size: int,
         hidden_dropout_prob: float = 0.1,
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
         self.hidden_act = hidden_act
-        self.intermediate = nn.Linear(d_model, d_feedforward)
-        self.output = nn.Linear(d_feedforward, d_model)
+        self.intermediate = nn.Linear(hidden_size, intermediate_size)
+        self.output = nn.Linear(intermediate_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.output(self.dropout(get_activation(self.hidden_act)(self.intermediate(x))))
 
 
 class MultiHeadAttention(nn.Module):
     def __init__(
-        self, d_model: int = 512, n_head: int = 8, attention_probs_dropout_prob: float = 0.1
+        self,
+        hidden_size: int = 768,
+        num_attention_heads: int = 12,
+        attention_probs_dropout_prob: float = 0.1,
     ) -> None:
         super().__init__()
 
-        self.d_model = d_model
-        self.d_per_head = d_model // n_head
-        self.n_head = n_head
-        self.query = nn.Linear(d_model, d_model)
-        self.key = nn.Linear(d_model, d_model)
-        self.value = nn.Linear(d_model, d_model)
+        self.hidden_size = hidden_size
+        self.dims_per_head = hidden_size // num_attention_heads
+        self.num_attention_heads = num_attention_heads
+        self.query = nn.Linear(hidden_size, hidden_size)
+        self.key = nn.Linear(hidden_size, hidden_size)
+        self.value = nn.Linear(hidden_size, hidden_size)
 
         self.attention = ScaledDotProductAttention(attention_probs_dropout_prob)
-        self.dense = nn.Linear(d_model, d_model)
+        self.dense = nn.Linear(hidden_size, hidden_size)
 
     def forward(
-        self, query: Tensor, key: Tensor, value: Tensor, mask: Optional[Tensor] = None
-    ) -> Tuple[Tensor, Tensor]:
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         batch_size = query.size(0)
 
         query = self.query(query)
@@ -121,33 +133,41 @@ class MultiHeadAttention(nn.Module):
         value = self.value(value)
 
         # multi head
-        query = query.view(batch_size, -1, self.n_head, self.d_per_head).transpose(1, 2)
-        key = key.view(batch_size, -1, self.n_head, self.d_per_head).transpose(1, 2)
-        value = value.view(batch_size, -1, self.n_head, self.d_per_head).transpose(1, 2)
+        query = query.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(
+            1, 2
+        )
+        key = key.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(1, 2)
+        value = value.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(
+            1, 2
+        )
 
         # self attention
         context, attention = self.attention(query, key, value, attn_mask=mask)
         # concat heads
-        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
+        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.hidden_size)
         output = self.dense(context)
 
         return output, attention
 
 
 class ScaledDotProductAttention(nn.Module):
-    def __init__(self, attention_probs_dropout_prob: float = 0.0) -> None:
+    def __init__(self, attention_probs_dropout_prob: float = 0.1) -> None:
         super().__init__()
         self.dropout = nn.Dropout(attention_probs_dropout_prob)
 
     def forward(
-        self, query: Tensor, key: Tensor, value: Tensor, attn_mask: Optional[Tensor] = None
-    ) -> Tuple[Tensor, Tensor]:
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attn_mask: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""
         Args:
-            query: [batch, len_query, dim_query]
-            key: [batch, len_key, dim_key]
-            value: [batch, len_value, dim_value]
-            attn_mask: [batch, len_query, len_key]
+            query: [batch, num_attention_heads, len_query, dim_query]
+            key: [batch, num_attention_heads, len_key, dim_key]
+            value: [batch, num_attention_heads, len_value, dim_value]
+            attn_mask: [batch, num_attention_heads, len_query, len_key]
         """
         attention = torch.matmul(query, key.transpose(-1, -2))
         attention = attention / math.sqrt(query.size(-1))

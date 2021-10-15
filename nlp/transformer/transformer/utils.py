@@ -156,7 +156,6 @@ class PreTrainedModel(nn.Module):
         self,
         attention_mask: torch.Tensor,
         input_ids: torch.Tensor,
-        device: Optional[Union[int, torch.device]] = None,
     ) -> torch.Tensor:
         if attention_mask.dim() == 3:
             extended_attention_mask = attention_mask[:, None, :, :]

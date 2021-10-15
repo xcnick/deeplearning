@@ -1,13 +1,13 @@
 import math
 
-import oneflow as flow
-import oneflow.nn as nn
+import paddle
+import paddle.nn as nn
 from typing import Tuple, Optional
 
-from .utils_of import get_activation
+from .utils_pd import get_activation
 
 
-class OFEncoder(nn.Module):
+class PDEncoder(nn.Layer):
     def __init__(
         self,
         num_hidden_layers: int,
@@ -19,9 +19,9 @@ class OFEncoder(nn.Module):
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.layers = nn.ModuleList(
+        self.layers = nn.LayerList(
             [
-                OFEncoderLayer(
+                EncoderLayer(
                     hidden_size,
                     num_attention_heads,
                     intermediate_size,
@@ -34,14 +34,14 @@ class OFEncoder(nn.Module):
         )
 
     def forward(
-        self, x: flow.Tensor, mask: Optional[flow.Tensor] = None
-    ) -> Tuple[flow.Tensor, flow.Tensor]:
+        self, x: paddle.Tensor, mask: Optional[paddle.Tensor] = None
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         for layer in self.layers:
             x, attn = layer(x, mask)
         return x, attn
 
 
-class OFEncoderLayer(nn.Module):
+class EncoderLayer(nn.Layer):
     def __init__(
         self,
         hidden_size: int,
@@ -52,19 +52,19 @@ class OFEncoderLayer(nn.Module):
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.self = OFMultiHeadAttention(
+        self.self = MultiHeadAttention(
             hidden_size, num_attention_heads, attention_probs_dropout_prob
         )
-        self.feed_forward = OFPositionwiseFeedForward(
+        self.feed_forward = PositionwiseFeedForward(
             hidden_size, intermediate_size, hidden_dropout_prob, hidden_act
         )
-        self.add_norm = nn.ModuleList(
-            [OFAddNormLayer(hidden_size, hidden_dropout_prob) for _ in range(2)]
+        self.add_norm = nn.LayerList(
+            [AddNormLayer(hidden_size, hidden_dropout_prob) for _ in range(2)]
         )
 
     def forward(
-        self, x: flow.Tensor, mask: Optional[flow.Tensor] = None
-    ) -> Tuple[flow.Tensor, flow.Tensor]:
+        self, x: paddle.Tensor, mask: Optional[paddle.Tensor] = None
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         x1, attn = self.self(x, x, x, mask)
         x = self.add_norm[0](x, x1)
         x1 = self.feed_forward(x)
@@ -72,17 +72,17 @@ class OFEncoderLayer(nn.Module):
         return x, attn
 
 
-class OFAddNormLayer(nn.Module):
+class AddNormLayer(nn.Layer):
     def __init__(self, hidden_size: int, hidden_dropout_prob: float = 0.1) -> None:
         super().__init__()
-        self.layer_norm = nn.LayerNorm(hidden_size, eps=1e-12)
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=1e-12)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, x: flow.Tensor, x1: flow.Tensor) -> flow.Tensor:
+    def forward(self, x: paddle.Tensor, x1: paddle.Tensor) -> paddle.Tensor:
         return self.layer_norm(x + self.dropout(x1))
 
 
-class OFPositionwiseFeedForward(nn.Module):
+class PositionwiseFeedForward(nn.Layer):
     def __init__(
         self,
         hidden_size: int,
@@ -96,11 +96,11 @@ class OFPositionwiseFeedForward(nn.Module):
         self.output = nn.Linear(intermediate_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, x: flow.Tensor) -> flow.Tensor:
+    def forward(self, x: paddle.Tensor) -> paddle.Tensor:
         return self.output(self.dropout(get_activation(self.hidden_act)(self.intermediate(x))))
 
 
-class OFMultiHeadAttention(nn.Module):
+class MultiHeadAttention(nn.Layer):
     def __init__(
         self,
         hidden_size: int = 768,
@@ -116,52 +116,52 @@ class OFMultiHeadAttention(nn.Module):
         self.key = nn.Linear(hidden_size, hidden_size)
         self.value = nn.Linear(hidden_size, hidden_size)
 
-        self.attention = OFScaledDotProductAttention(attention_probs_dropout_prob)
+        self.attention = ScaledDotProductAttention(attention_probs_dropout_prob)
         self.dense = nn.Linear(hidden_size, hidden_size)
 
     def forward(
         self,
-        query: flow.Tensor,
-        key: flow.Tensor,
-        value: flow.Tensor,
-        mask: Optional[flow.Tensor] = None,
-    ) -> Tuple[flow.Tensor, flow.Tensor]:
-        batch_size = query.size(0)
+        query: paddle.Tensor,
+        key: paddle.Tensor,
+        value: paddle.Tensor,
+        mask: Optional[paddle.Tensor] = None,
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
+        batch_size = query.shape[0]
 
         query = self.query(query)
         key = self.key(key)
         value = self.value(value)
 
         # multi head
-        query = query.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(
-            1, 2
+        query = query.reshape((batch_size, -1, self.num_attention_heads, self.dims_per_head)).transpose(
+            (0, 2, 1, 3)
         )
-        key = key.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(1, 2)
-        value = value.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(
-            1, 2
+        key = key.reshape((batch_size, -1, self.num_attention_heads, self.dims_per_head)).transpose((0, 2, 1, 3))
+        value = value.reshape((batch_size, -1, self.num_attention_heads, self.dims_per_head)).transpose(
+            (0, 2, 1, 3)
         )
 
         # self attention
         context, attention = self.attention(query, key, value, attn_mask=mask)
         # concat heads
-        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.hidden_size)
+        context = context.transpose((0, 2, 1, 3)).reshape((batch_size, -1, self.hidden_size))
         output = self.dense(context)
 
         return output, attention
 
 
-class OFScaledDotProductAttention(nn.Module):
+class ScaledDotProductAttention(nn.Layer):
     def __init__(self, attention_probs_dropout_prob: float = 0.1) -> None:
         super().__init__()
         self.dropout = nn.Dropout(attention_probs_dropout_prob)
 
     def forward(
         self,
-        query: flow.Tensor,
-        key: flow.Tensor,
-        value: flow.Tensor,
-        attn_mask: Optional[flow.Tensor] = None,
-    ) -> Tuple[flow.Tensor, flow.Tensor]:
+        query: paddle.Tensor,
+        key: paddle.Tensor,
+        value: paddle.Tensor,
+        attn_mask: Optional[paddle.Tensor] = None,
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         r"""
         Args:
             query: [batch, num_attention_heads, len_query, dim_query]
@@ -169,11 +169,11 @@ class OFScaledDotProductAttention(nn.Module):
             value: [batch, num_attention_heads, len_value, dim_value]
             attn_mask: [batch, num_attention_heads, len_query, len_key]
         """
-        attention = flow.matmul(query, key.transpose(-1, -2))
-        attention = attention / math.sqrt(query.size(-1))
+        attention = paddle.matmul(query, key.transpose((0, 1, 3, 2)))
+        attention = attention / math.sqrt(query.shape[-1])
         if attn_mask is not None:
             attention = attention + attn_mask
-        attention = nn.Softmax(dim=-1)(attention)
+        attention = nn.Softmax(axis=-1)(attention)
         attention = self.dropout(attention)
-        context = flow.matmul(attention, value)
+        context = paddle.matmul(attention, value)
         return context, attention
