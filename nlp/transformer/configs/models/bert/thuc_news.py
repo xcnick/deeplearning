@@ -7,5 +7,4 @@ model = dict(
         json_file="/workspace/models/nlp/chinese_wwm_ext/bert_config.json",
         num_labels=14,
     ),
-    model_path="/workspace/models/nlp/chinese_wwm_ext/model_tf.bin"
-)
+    model_path="/workspace/models/nlp/chinese_wwm_ext/model_tf.bin")

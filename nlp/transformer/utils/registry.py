@@ -1,5 +1,4 @@
 import inspect
-from functools import partial
 
 
 def build_from_cfg(cfg, registry, default_args=None):
@@ -17,12 +16,13 @@ def build_from_cfg(cfg, registry, default_args=None):
         if default_args is None or "type" not in default_args:
             raise KeyError(
                 '`cfg` or `default_args` must contain the key "type", '
-                f"but got {cfg}\n{default_args}"
-            )
+                f"but got {cfg}\n{default_args}")
     if not isinstance(registry, Registry):
-        raise TypeError("registry must be an Registry object, " f"but got {type(registry)}")
+        raise TypeError("registry must be an Registry object, "
+                        f"but got {type(registry)}")
     if not (isinstance(default_args, dict) or default_args is None):
-        raise TypeError("default_args must be a dict or None, " f"but got {type(default_args)}")
+        raise TypeError("default_args must be a dict or None, "
+                        f"but got {type(default_args)}")
 
     args = cfg.copy()
 
@@ -34,11 +34,13 @@ def build_from_cfg(cfg, registry, default_args=None):
     if isinstance(obj_type, str):
         obj_cls = registry.get(obj_type)
         if obj_cls is None:
-            raise KeyError(f"{obj_type} is not in the {registry.name} registry")
+            raise KeyError(
+                f"{obj_type} is not in the {registry.name} registry")
     elif inspect.isclass(obj_type):
         obj_cls = obj_type
     else:
-        raise TypeError(f"type must be a str or valid type, but got {type(obj_type)}")
+        raise TypeError(
+            f"type must be a str or valid type, but got {type(obj_type)}")
     try:
         return obj_cls(**args)
     except Exception as e:
@@ -83,13 +85,15 @@ class Registry:
 
     def _register_module(self, module_class, module_name=None, force=False):
         if not inspect.isclass(module_class):
-            raise TypeError("module must be a class, " f"but got {type(module_class)}")
+            raise TypeError("module must be a class, "
+                            f"but got {type(module_class)}")
 
         if module_name is None:
             module_name = module_class.__name__
 
         if not force and module_name in self._module_dict:
-            raise KeyError(f"{module_name} is already registered " f"in {self.name}")
+            raise KeyError(f"{module_name} is already registered "
+                           f"in {self.name}")
         self._module_dict[module_name] = module_class
 
     def register_module(self, name=None, force=False, module=None):
@@ -122,7 +126,8 @@ class Registry:
 
         # use it as a normal method: x.register_module(module=SomeClass)
         if module is not None:
-            self._register_module(module_class=module, module_name=name, force=force)
+            self._register_module(
+                module_class=module, module_name=name, force=force)
             return module
 
         # raise the error ahead of time
@@ -131,7 +136,8 @@ class Registry:
 
         # use it as a decorator: @x.register_module()
         def _register(cls):
-            self._register_module(module_class=cls, module_name=name, force=force)
+            self._register_module(
+                module_class=cls, module_name=name, force=force)
             return cls
 
         return _register

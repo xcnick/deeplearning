@@ -1,4 +1,5 @@
-import unicodedata, re
+import re
+import unicodedata
 import collections
 
 from transformer.builder import TOKENIZERS
@@ -16,6 +17,7 @@ def load_vocab(vocab_file):
 
 
 class BasicTokenizer(object):
+
     def __init__(self, token_start="[CLS]", token_end="[SEP]"):
         self._token_pad = "[PAD]"
         self._token_unk = "[UNK]"
@@ -62,7 +64,11 @@ class BasicTokenizer(object):
         """
         return [self._convert_id_to_token(i) for i in ids]
 
-    def truncate_sequence(self, max_length, first_sequence, second_sequence=None, pop_index=-1):
+    def truncate_sequence(self,
+                          max_length,
+                          first_sequence,
+                          second_sequence=None,
+                          pop_index=-1):
         """截断总长度
         """
         if second_sequence is None:
@@ -111,28 +117,24 @@ class BasicTokenizer(object):
 
         return first_token_ids, first_segment_ids
 
-    def _tokenize(self, text):
-        """基本分词函数
-        """
-        raise NotImplementedError
-
 
 @TOKENIZERS.register_module()
 class Tokenizer(BasicTokenizer):
+
     def __init__(self, vocab_file, do_lower_case=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._vocab = load_vocab(vocab_file)
         self._do_lower_case = do_lower_case
-        self._ids_to_tokens = collections.OrderedDict(
-            [(ids, tok) for tok, ids in self._vocab.items()]
-        )
+        self._ids_to_tokens = collections.OrderedDict([
+            (ids, tok) for tok, ids in self._vocab.items()
+        ])
         self._vocab_size = len(self._vocab)
 
         for token in ["pad", "unk", "mask", "start", "end"]:
             try:
                 _token_id = self._vocab[getattr(self, "_token_%s" % token)]
                 setattr(self, "_token_%s_id" % token, _token_id)
-            except:
+            except KeyError:
                 pass
 
     def _convert_token_to_id(self, token):
@@ -151,7 +153,7 @@ class Tokenizer(BasicTokenizer):
         tokens = tokens or self.convert_ids_to_tokens(ids)
         tokens = [token for token in tokens if not self._is_special(token)]
 
-        text, flag = "", False
+        text = ""
         for i, token in enumerate(tokens):
             if token[:2] == "##":
                 text += token[2:]
@@ -181,7 +183,8 @@ class Tokenizer(BasicTokenizer):
         """
         if self._do_lower_case:
             text = unicodedata.normalize("NFD", text)
-            text = "".join([ch for ch in text if unicodedata.category(ch) != "Mn"])
+            text = "".join(
+                [ch for ch in text if unicodedata.category(ch) != "Mn"])
             text = text.lower()
 
         spaced = ""
@@ -238,9 +241,8 @@ class Tokenizer(BasicTokenizer):
     def _is_space(ch):
         """空格类字符判断
         """
-        return (
-            ch == " " or ch == "\n" or ch == "\r" or ch == "\t" or unicodedata.category(ch) == "Zs"
-        )
+        return (ch == " " or ch == "\n" or ch == "\r" or ch == "\t"
+                or unicodedata.category(ch) == "Zs")
 
     @staticmethod
     def _is_punctuation(ch):
@@ -250,17 +252,21 @@ class Tokenizer(BasicTokenizer):
         在py3下的结果是'Po'。
         """
         code = ord(ch)
-        return (
-            33 <= code <= 47
-            or 58 <= code <= 64
-            or 91 <= code <= 96
-            or 123 <= code <= 126
-            or unicodedata.category(ch).startswith("P")
-        )
+        return (33 <= code <= 47 or 58 <= code <= 64 or 91 <= code <= 96
+                or 123 <= code <= 126
+                or unicodedata.category(ch).startswith("P"))
 
     @staticmethod
     def _cjk_punctuation():
-        return u"\uff02\uff03\uff04\uff05\uff06\uff07\uff08\uff09\uff0a\uff0b\uff0c\uff0d\uff0f\uff1a\uff1b\uff1c\uff1d\uff1e\uff20\uff3b\uff3c\uff3d\uff3e\uff3f\uff40\uff5b\uff5c\uff5d\uff5e\uff5f\uff60\uff62\uff63\uff64\u3000\u3001\u3003\u3008\u3009\u300a\u300b\u300c\u300d\u300e\u300f\u3010\u3011\u3014\u3015\u3016\u3017\u3018\u3019\u301a\u301b\u301c\u301d\u301e\u301f\u3030\u303e\u303f\u2013\u2014\u2018\u2019\u201b\u201c\u201d\u201e\u201f\u2026\u2027\ufe4f\ufe51\ufe54\xb7\uff01\uff1f\uff61\u3002"
+        return u"\uff02\uff03\uff04\uff05\uff06\uff07\uff08\uff09\uff0a"\
+               u"\uff0b\uff0c\uff0d\uff0f\uff1a\uff1b\uff1c\uff1d\uff1e"\
+               u"\uff20\uff3b\uff3c\uff3d\uff3e\uff3f\uff40\uff5b\uff5c"\
+               u"\uff5d\uff5e\uff5f\uff60\uff62\uff63\uff64\u3000\u3001"\
+               u"\u3003\u3008\u3009\u300a\u300b\u300c\u300d\u300e\u300f"\
+               u"\u3010\u3011\u3014\u3015\u3016\u3017\u3018\u3019\u301a"\
+               u"\u301b\u301c\u301d\u301e\u301f\u3030\u303e\u303f\u2013"\
+               u"\u2014\u2018\u2019\u201b\u201c\u201d\u201e\u201f\u2026"\
+               u"\u2027\ufe4f\ufe51\ufe54\xb7\uff01\uff1f\uff61\u3002"
 
     @staticmethod
     def _is_cjk_character(ch):
@@ -268,16 +274,10 @@ class Tokenizer(BasicTokenizer):
         参考：https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
         """
         code = ord(ch)
-        return (
-            0x4E00 <= code <= 0x9FFF
-            or 0x3400 <= code <= 0x4DBF
-            or 0x20000 <= code <= 0x2A6DF
-            or 0x2A700 <= code <= 0x2B73F
-            or 0x2B740 <= code <= 0x2B81F
-            or 0x2B820 <= code <= 0x2CEAF
-            or 0xF900 <= code <= 0xFAFF
-            or 0x2F800 <= code <= 0x2FA1F
-        )
+        return (0x4E00 <= code <= 0x9FFF or 0x3400 <= code <= 0x4DBF
+                or 0x20000 <= code <= 0x2A6DF or 0x2A700 <= code <= 0x2B73F
+                or 0x2B740 <= code <= 0x2B81F or 0x2B820 <= code <= 0x2CEAF
+                or 0xF900 <= code <= 0xFAFF or 0x2F800 <= code <= 0x2FA1F)
 
     @staticmethod
     def _is_control(ch):

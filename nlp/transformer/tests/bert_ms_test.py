@@ -20,6 +20,7 @@ context.set_context(mode=context.GRAPH_MODE, device_target="GPU")
 
 
 class TestBertModel:
+
     @classmethod
     def setup_class(cls):
         cls.config_file_path = "/workspace/models/nlp/chinese_wwm_ext/bert_config.json"
@@ -34,8 +35,7 @@ class TestBertModel:
         cls.model_tf = build_ms_models(model_cfg)
         cls.model_hf = build_ms_models(model_cfg)
         cls.model_base = transformers.BertModel.from_pretrained(
-            cls.huggingface_model_path, config=cls.config_file_path
-        )
+            cls.huggingface_model_path, config=cls.config_file_path)
         cls.model_base.eval()
         # cls.model_base_mlm = transformers.BertForPreTraining.from_pretrained(
         #     cls.huggingface_model_path, config=cls.config_file_path
@@ -46,25 +46,29 @@ class TestBertModel:
         cls.batch_size = 4
         cls.seq_length = 10
         cls.tokens_tensor = {
-            "input_ids": ops.uniform(
+            "input_ids":
+            ops.uniform(
                 shape=(cls.batch_size, cls.seq_length),
                 minval=Tensor(1, mindspore.int32),
                 maxval=Tensor(100, mindspore.int32),
                 dtype=mindspore.int32,
             ),
-            "attention_mask": ops.uniform(
+            "attention_mask":
+            ops.uniform(
                 shape=(cls.batch_size, cls.seq_length),
                 minval=Tensor(0, mindspore.int32),
                 maxval=Tensor(2, mindspore.int32),
                 dtype=mindspore.int32,
             ),
-            "token_type_ids": ops.uniform(
+            "token_type_ids":
+            ops.uniform(
                 shape=(cls.batch_size, cls.seq_length),
                 minval=Tensor(0, mindspore.int32),
                 maxval=Tensor(2, mindspore.int32),
                 dtype=mindspore.int32,
             ),
-            "position_ids": ops.uniform(
+            "position_ids":
+            ops.uniform(
                 shape=(cls.batch_size, cls.seq_length),
                 minval=Tensor(0, mindspore.int32),
                 maxval=Tensor(cls.seq_length, mindspore.int32),
@@ -94,39 +98,42 @@ class TestBertModel:
         encoder_output = output_dict[0]
         pooled_output = output_dict[1]
         prediction_scores = output_dict[2]
-        assert encoder_output.shape == (self.batch_size, self.seq_length, self.config.hidden_size)
-        assert pooled_output.shape == (self.batch_size, self.config.hidden_size)
-        assert prediction_scores.shape == (self.batch_size, self.seq_length, self.config.vocab_size)
+        assert encoder_output.shape == (self.batch_size, self.seq_length,
+                                        self.config.hidden_size)
+        assert pooled_output.shape == (self.batch_size,
+                                       self.config.hidden_size)
+        assert prediction_scores.shape == (self.batch_size, self.seq_length,
+                                           self.config.vocab_size)
 
     def test_tf_and_huggingface_compare(self):
         load_tf_weights_in_bert_to_ms(
-            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True
-        )
+            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
 
         load_huggingface_weights_in_bert_to_ms(
-            self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
-        )
+            self.model_hf,
+            self.config,
+            self.huggingface_model_path,
+            with_mlm=True)
 
-        for tf_param, hf_param in zip(
-            self.model_tf.parameters_and_names(), self.model_hf.parameters_and_names()
-        ):
+        for tf_param, hf_param in zip(self.model_tf.parameters_and_names(),
+                                      self.model_hf.parameters_and_names()):
             assert tf_param[0] == hf_param[0]
             assert np.array_equal(tf_param[1].asnumpy(), hf_param[1].asnumpy())
 
-        for tf_param, ms_param in zip(
-            self.model_tf.parameters_and_names(), self.model.parameters_and_names()
-        ):
+        for tf_param, ms_param in zip(self.model_tf.parameters_and_names(),
+                                      self.model.parameters_and_names()):
             assert tf_param[0] == ms_param[0]
             assert np.array_equal(tf_param[1].asnumpy(), ms_param[1].asnumpy())
 
     def test_model_forward(self):
         load_tf_weights_in_bert_to_ms(
-            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True
-        )
+            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
 
         load_huggingface_weights_in_bert_to_ms(
-            self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
-        )
+            self.model_hf,
+            self.config,
+            self.huggingface_model_path,
+            with_mlm=True)
 
         output_dict_tf = self.model_tf(self.tokens_tensor)
         output_dict_hf = self.model_hf(self.tokens_tensor)
@@ -152,16 +159,17 @@ class TestBertModel:
         )
 
         base_output = self.model_base(
-            input_ids=torch.tensor(self.tokens_tensor["input_ids"].asnumpy(), dtype=torch.long),
+            input_ids=torch.tensor(
+                self.tokens_tensor["input_ids"].asnumpy(), dtype=torch.long),
             attention_mask=torch.tensor(
-                self.tokens_tensor["attention_mask"].asnumpy(), dtype=torch.long
-            ),
+                self.tokens_tensor["attention_mask"].asnumpy(),
+                dtype=torch.long),
             token_type_ids=torch.tensor(
-                self.tokens_tensor["token_type_ids"].asnumpy(), dtype=torch.long
-            ),
+                self.tokens_tensor["token_type_ids"].asnumpy(),
+                dtype=torch.long),
             position_ids=torch.tensor(
-                self.tokens_tensor["position_ids"].asnumpy(), dtype=torch.long
-            ),
+                self.tokens_tensor["position_ids"].asnumpy(),
+                dtype=torch.long),
             return_dict=True,
         )
         # base_mlm_output = self.model_base_mlm(
@@ -182,22 +190,34 @@ class TestBertModel:
         pooler_output = base_output["pooler_output"].detach().numpy()
         # prediction_logits = base_mlm_output["prediction_logits"].detach().numpy()
 
-        assert np.max(np.abs(hf_encoder_output.asnumpy() - tf_encoder_output.asnumpy())) < 1e-3
-        assert np.max(np.abs(hf_pooled_output.asnumpy() - tf_pooled_output.asnumpy())) < 1e-3
-        assert np.max(np.abs(hf_mlm_output.asnumpy() - tf_mlm_output.asnumpy())) < 1e-3
+        assert np.max(
+            np.abs(hf_encoder_output.asnumpy() -
+                   tf_encoder_output.asnumpy())) < 1e-3
+        assert np.max(
+            np.abs(hf_pooled_output.asnumpy() -
+                   tf_pooled_output.asnumpy())) < 1e-3
+        assert np.max(
+            np.abs(hf_mlm_output.asnumpy() - tf_mlm_output.asnumpy())) < 1e-3
 
-        assert np.max(np.abs(hf_encoder_output.asnumpy() - encoder_output.asnumpy())) < 1e-3
-        assert np.max(np.abs(hf_pooled_output.asnumpy() - pooled_output.asnumpy())) < 1e-3
-        assert np.max(np.abs(hf_mlm_output.asnumpy() - mlm_output.asnumpy())) < 1e-3
+        assert np.max(
+            np.abs(hf_encoder_output.asnumpy() -
+                   encoder_output.asnumpy())) < 1e-3
+        assert np.max(
+            np.abs(hf_pooled_output.asnumpy() -
+                   pooled_output.asnumpy())) < 1e-3
+        assert np.max(
+            np.abs(hf_mlm_output.asnumpy() - mlm_output.asnumpy())) < 1e-3
 
-        assert np.max(np.abs(hf_encoder_output.asnumpy() - last_hidden_state)) < 1e-1
-        assert np.max(np.abs(hf_pooled_output.asnumpy() - pooler_output)) < 1e-1
-        # assert np.max(np.abs(hf_mlm_output.asnumpy() - prediction_logits)) < 1e-1
+        assert np.max(
+            np.abs(hf_encoder_output.asnumpy() - last_hidden_state)) < 1e-1
+        assert np.max(
+            np.abs(hf_pooled_output.asnumpy() - pooler_output)) < 1e-1
 
-        assert np.max(np.abs(tf_encoder_output.asnumpy() - last_hidden_state)) < 1e-1
-        assert np.max(np.abs(tf_pooled_output.asnumpy() - pooler_output)) < 1e-1
-        # assert np.max(np.abs(tf_mlm_output.asnumpy() - prediction_logits)) < 1e-1
+        assert np.max(
+            np.abs(tf_encoder_output.asnumpy() - last_hidden_state)) < 1e-1
+        assert np.max(
+            np.abs(tf_pooled_output.asnumpy() - pooler_output)) < 1e-1
 
-        assert np.max(np.abs(encoder_output.asnumpy() - last_hidden_state)) < 1e-1
+        assert np.max(
+            np.abs(encoder_output.asnumpy() - last_hidden_state)) < 1e-1
         assert np.max(np.abs(pooled_output.asnumpy() - pooler_output)) < 1e-1
-        # assert np.max(np.abs(mlm_output.asnumpy() - prediction_logits)) < 1e-1

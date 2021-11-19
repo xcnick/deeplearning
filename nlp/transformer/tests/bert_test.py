@@ -10,6 +10,7 @@ from transformer.transformer.bert import (
 
 
 class TestBertModel:
+
     @classmethod
     def setup_class(cls):
         cls.config_file_path = "/workspace/models/nlp/uncased_L-12_H-768_A-12/bert_config.json"
@@ -24,12 +25,10 @@ class TestBertModel:
         cls.model_tf = build_torch_models(model_cfg)
         cls.model_hf = build_torch_models(model_cfg)
         cls.model_base = transformers.BertModel.from_pretrained(
-            cls.huggingface_model_path, return_dict=True
-        )
+            cls.huggingface_model_path, return_dict=True)
         cls.model_base.eval()
         cls.model_base_mlm = transformers.BertForPreTraining.from_pretrained(
-            cls.huggingface_model_path, return_dict=True
-        )
+            cls.huggingface_model_path, return_dict=True)
         cls.model_base_mlm.eval()
         model_cfg.update({"model_path": cls.model_path})
         cls.model = build_torch_models(model_cfg)
@@ -37,18 +36,30 @@ class TestBertModel:
         cls.batch_size = 4
         cls.seq_length = 10
         cls.tokens_tensor = {
-            "input_ids": torch.randint(
-                low=1, high=100, size=(cls.batch_size, cls.seq_length), dtype=torch.long
-            ),
-            "attention_mask": torch.randint(
-                low=0, high=1, size=(cls.batch_size, cls.seq_length), dtype=torch.long
-            ),
-            "token_type_ids": torch.randint(
-                low=0, high=1, size=(cls.batch_size, cls.seq_length), dtype=torch.long
-            ),
-            "position_ids": torch.randint(
-                low=0, high=cls.batch_size, size=(cls.batch_size, cls.seq_length), dtype=torch.long
-            ),
+            "input_ids":
+            torch.randint(
+                low=1,
+                high=100,
+                size=(cls.batch_size, cls.seq_length),
+                dtype=torch.long),
+            "attention_mask":
+            torch.randint(
+                low=0,
+                high=1,
+                size=(cls.batch_size, cls.seq_length),
+                dtype=torch.long),
+            "token_type_ids":
+            torch.randint(
+                low=0,
+                high=1,
+                size=(cls.batch_size, cls.seq_length),
+                dtype=torch.long),
+            "position_ids":
+            torch.randint(
+                low=0,
+                high=cls.batch_size,
+                size=(cls.batch_size, cls.seq_length),
+                dtype=torch.long),
         }
 
     @classmethod
@@ -73,36 +84,45 @@ class TestBertModel:
         encoder_output = output_dict["encoder_output"]
         pooled_output = output_dict["pooled_output"]
         prediction_scores = output_dict["prediction_scores"]
-        assert encoder_output.shape == (self.batch_size, self.seq_length, self.config.hidden_size)
-        assert pooled_output.shape == (self.batch_size, self.config.hidden_size)
-        assert prediction_scores.shape == (self.batch_size, self.seq_length, self.config.vocab_size)
+        assert encoder_output.shape == (self.batch_size, self.seq_length,
+                                        self.config.hidden_size)
+        assert pooled_output.shape == (self.batch_size,
+                                       self.config.hidden_size)
+        assert prediction_scores.shape == (self.batch_size, self.seq_length,
+                                           self.config.vocab_size)
 
     def test_tf_and_huggingface_compare(self):
-        load_tf_weights_in_bert(self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
+        load_tf_weights_in_bert(
+            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
         self.model_tf.eval()
 
         load_huggingface_weights_in_bert(
-            self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
-        )
+            self.model_hf,
+            self.config,
+            self.huggingface_model_path,
+            with_mlm=True)
         self.model_hf.eval()
 
-        for tf_param, hf_param in zip(self.model_tf.state_dict(), self.model_hf.state_dict()):
-            assert torch.equal(
-                self.model_tf.state_dict()[tf_param], self.model_hf.state_dict()[hf_param]
-            )
+        for tf_param, hf_param in zip(self.model_tf.state_dict(),
+                                      self.model_hf.state_dict()):
+            assert torch.equal(self.model_tf.state_dict()[tf_param],
+                               self.model_hf.state_dict()[hf_param])
 
-        for tf_param, pt_param in zip(self.model_hf.state_dict(), self.model.state_dict()):
-            assert torch.equal(
-                self.model_hf.state_dict()[tf_param], self.model.state_dict()[pt_param]
-            )
+        for tf_param, pt_param in zip(self.model_hf.state_dict(),
+                                      self.model.state_dict()):
+            assert torch.equal(self.model_hf.state_dict()[tf_param],
+                               self.model.state_dict()[pt_param])
 
     def test_model_forward(self):
-        load_tf_weights_in_bert(self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
+        load_tf_weights_in_bert(
+            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
         self.model_tf.eval()
 
         load_huggingface_weights_in_bert(
-            self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
-        )
+            self.model_hf,
+            self.config,
+            self.huggingface_model_path,
+            with_mlm=True)
         self.model_hf.eval()
 
         output_dict_tf = self.model_tf(self.tokens_tensor)
@@ -137,14 +157,29 @@ class TestBertModel:
             position_ids=self.tokens_tensor["position_ids"],
         )
 
-        assert torch.max(torch.abs(hf_encoder_output - base_output["last_hidden_state"])) < 1e-3
-        assert torch.max(torch.abs(hf_pooled_output - base_output["pooler_output"])) < 1e-3
-        assert torch.max(torch.abs(hf_mlm_output - base_mlm_output["prediction_logits"])) < 1e-3
+        assert torch.max(
+            torch.abs(hf_encoder_output -
+                      base_output["last_hidden_state"])) < 1e-3
+        assert torch.max(
+            torch.abs(hf_pooled_output - base_output["pooler_output"])) < 1e-3
+        assert torch.max(
+            torch.abs(hf_mlm_output -
+                      base_mlm_output["prediction_logits"])) < 1e-3
 
-        assert torch.max(torch.abs(tf_encoder_output - base_output["last_hidden_state"])) < 1e-3
-        assert torch.max(torch.abs(tf_pooled_output - base_output["pooler_output"])) < 1e-3
-        assert torch.max(torch.abs(tf_mlm_output - base_mlm_output["prediction_logits"])) < 1e-3
+        assert torch.max(
+            torch.abs(tf_encoder_output -
+                      base_output["last_hidden_state"])) < 1e-3
+        assert torch.max(
+            torch.abs(tf_pooled_output - base_output["pooler_output"])) < 1e-3
+        assert torch.max(
+            torch.abs(tf_mlm_output -
+                      base_mlm_output["prediction_logits"])) < 1e-3
 
-        assert torch.max(torch.abs(encoder_output - base_output["last_hidden_state"])) < 1e-3
-        assert torch.max(torch.abs(pooled_output - base_output["pooler_output"])) < 1e-3
-        assert torch.max(torch.abs(mlm_output - base_mlm_output["prediction_logits"])) < 1e-3
+        assert torch.max(
+            torch.abs(encoder_output -
+                      base_output["last_hidden_state"])) < 1e-3
+        assert torch.max(
+            torch.abs(pooled_output - base_output["pooler_output"])) < 1e-3
+        assert torch.max(
+            torch.abs(mlm_output -
+                      base_mlm_output["prediction_logits"])) < 1e-3

@@ -11,6 +11,7 @@ from .utils_ms import get_activation
 
 
 class Encoder(nn.Cell):
+
     def __init__(
         self,
         num_hidden_layers: int,
@@ -23,24 +24,22 @@ class Encoder(nn.Cell):
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.layers = nn.CellList(
-            [
-                EncoderLayer(
-                    hidden_size,
-                    num_attention_heads,
-                    intermediate_size,
-                    initializer_range,
-                    attention_probs_dropout_prob,
-                    hidden_dropout_prob,
-                    hidden_act,
-                )
-                for _ in range(num_hidden_layers)
-            ]
-        )
+        self.layers = nn.CellList([
+            EncoderLayer(
+                hidden_size,
+                num_attention_heads,
+                intermediate_size,
+                initializer_range,
+                attention_probs_dropout_prob,
+                hidden_dropout_prob,
+                hidden_act,
+            ) for _ in range(num_hidden_layers)
+        ])
 
     def construct(
-        self, x: ms.Tensor, mask: Optional[ms.Tensor] = None
-    ) -> Tuple[ms.Tensor, ms.Tensor]:
+            self,
+            x: ms.Tensor,
+            mask: Optional[ms.Tensor] = None) -> Tuple[ms.Tensor, ms.Tensor]:
         attn = None
         for layer in self.layers:
             x, attn = layer(x, mask)
@@ -48,6 +47,7 @@ class Encoder(nn.Cell):
 
 
 class EncoderLayer(nn.Cell):
+
     def __init__(
         self,
         hidden_size: int,
@@ -59,17 +59,20 @@ class EncoderLayer(nn.Cell):
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.self_attn = MultiHeadAttention(
-            hidden_size, num_attention_heads, initializer_range, attention_probs_dropout_prob
-        )
-        self.feed_forward = PositionwiseFeedForward(
-            hidden_size, intermediate_size, initializer_range, hidden_dropout_prob, hidden_act
-        )
+        self.self_attn = MultiHeadAttention(hidden_size, num_attention_heads,
+                                            initializer_range,
+                                            attention_probs_dropout_prob)
+        self.feed_forward = PositionwiseFeedForward(hidden_size,
+                                                    intermediate_size,
+                                                    initializer_range,
+                                                    hidden_dropout_prob,
+                                                    hidden_act)
         self.add_norm = nn.CellList(
-            [AddNormLayer(hidden_size, hidden_dropout_prob) for _ in range(2)]
-        )
+            [AddNormLayer(hidden_size, hidden_dropout_prob) for _ in range(2)])
 
-    def construct(self, x: ms.Tensor, mask: Optional[ms.Tensor] = None) -> Tuple[ms.Tensor, ...]:
+    def construct(self,
+                  x: ms.Tensor,
+                  mask: Optional[ms.Tensor] = None) -> Tuple[ms.Tensor, ...]:
         x1, attn = self.self_attn(x, x, x, mask)
         x = self.add_norm[0](x, x1)
         x1 = self.feed_forward(x)
@@ -78,9 +81,12 @@ class EncoderLayer(nn.Cell):
 
 
 class AddNormLayer(nn.Cell):
-    def __init__(self, hidden_size: int, hidden_dropout_prob: int = 0.1) -> None:
+
+    def __init__(self,
+                 hidden_size: int,
+                 hidden_dropout_prob: int = 0.1) -> None:
         super().__init__()
-        self.layer_norm = nn.LayerNorm((hidden_size,), epsilon=1e-12)
+        self.layer_norm = nn.LayerNorm((hidden_size, ), epsilon=1e-12)
         self.dropout = nn.Dropout(1.0 - hidden_dropout_prob)
 
     def construct(self, x: ms.Tensor, x1: ms.Tensor) -> ms.Tensor:
@@ -88,6 +94,7 @@ class AddNormLayer(nn.Cell):
 
 
 class PositionwiseFeedForward(nn.Cell):
+
     def __init__(
         self,
         hidden_size: int,
@@ -99,18 +106,23 @@ class PositionwiseFeedForward(nn.Cell):
         super().__init__()
         self.hidden_act = hidden_act
         self.intermediate = nn.Dense(
-            hidden_size, intermediate_size, weight_init=TruncatedNormal(initializer_range)
-        )
+            hidden_size,
+            intermediate_size,
+            weight_init=TruncatedNormal(initializer_range))
         self.output = nn.Dense(
-            intermediate_size, hidden_size, weight_init=TruncatedNormal(initializer_range)
-        )
+            intermediate_size,
+            hidden_size,
+            weight_init=TruncatedNormal(initializer_range))
         self.dropout = nn.Dropout(1.0 - hidden_dropout_prob)
 
     def construct(self, x: ms.Tensor) -> ms.Tensor:
-        return self.output(self.dropout(get_activation(self.hidden_act)(self.intermediate(x))))
+        return self.output(
+            self.dropout(
+                get_activation(self.hidden_act)(self.intermediate(x))))
 
 
 class MultiHeadAttention(nn.Cell):
+
     def __init__(
         self,
         hidden_size: int = 768,
@@ -124,23 +136,31 @@ class MultiHeadAttention(nn.Cell):
         self.dims_per_head = hidden_size // num_attention_heads
         self.num_attention_heads = num_attention_heads
         self.query = nn.Dense(
-            hidden_size, hidden_size, weight_init=TruncatedNormal(initializer_range)
-        )
+            hidden_size,
+            hidden_size,
+            weight_init=TruncatedNormal(initializer_range))
         self.key = nn.Dense(
-            hidden_size, hidden_size, weight_init=TruncatedNormal(initializer_range)
-        )
+            hidden_size,
+            hidden_size,
+            weight_init=TruncatedNormal(initializer_range))
         self.value = nn.Dense(
-            hidden_size, hidden_size, weight_init=TruncatedNormal(initializer_range)
-        )
+            hidden_size,
+            hidden_size,
+            weight_init=TruncatedNormal(initializer_range))
 
-        self.attention = ScaledDotProductAttention(attention_probs_dropout_prob)
+        self.attention = ScaledDotProductAttention(
+            attention_probs_dropout_prob)
         self.dense = nn.Dense(
-            hidden_size, hidden_size, weight_init=TruncatedNormal(initializer_range)
-        )
+            hidden_size,
+            hidden_size,
+            weight_init=TruncatedNormal(initializer_range))
 
     def construct(
-        self, query: ms.Tensor, key: ms.Tensor, value: ms.Tensor, mask: Optional[ms.Tensor] = None
-    ) -> Tuple[ms.Tensor, ms.Tensor]:
+            self,
+            query: ms.Tensor,
+            key: ms.Tensor,
+            value: ms.Tensor,
+            mask: Optional[ms.Tensor] = None) -> Tuple[ms.Tensor, ms.Tensor]:
         batch_size = query.shape[0]
 
         query = self.query(query)
@@ -148,20 +168,18 @@ class MultiHeadAttention(nn.Cell):
         value = self.value(value)
 
         # multi head
-        query = query.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(
-            0, 2, 1, 3
-        )
-        key = key.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(
-            0, 2, 1, 3
-        )
-        value = value.view(batch_size, -1, self.num_attention_heads, self.dims_per_head).transpose(
-            0, 2, 1, 3
-        )
+        query = query.view(batch_size, -1, self.num_attention_heads,
+                           self.dims_per_head).transpose(0, 2, 1, 3)
+        key = key.view(batch_size, -1, self.num_attention_heads,
+                       self.dims_per_head).transpose(0, 2, 1, 3)
+        value = value.view(batch_size, -1, self.num_attention_heads,
+                           self.dims_per_head).transpose(0, 2, 1, 3)
 
         # self attention
         context, attention = self.attention(query, key, value, attn_mask=mask)
         # concat heads
-        context = context.transpose(0, 2, 1, 3).view(batch_size, -1, self.hidden_size)
+        context = context.transpose(0, 2, 1, 3).view(batch_size, -1,
+                                                     self.hidden_size)
         output = self.dense(context)
 
         return output, attention
@@ -173,6 +191,7 @@ def generate_factor(dims: int):
 
 
 class ScaledDotProductAttention(nn.Cell):
+
     def __init__(self, attention_probs_dropout_prob: float = 0.1) -> None:
         super().__init__()
         self.dropout = nn.Dropout(1.0 - attention_probs_dropout_prob)

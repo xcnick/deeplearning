@@ -12,6 +12,7 @@ import re
 
 @DATASETS.register_module()
 class IQIYIDramaNewsDataset(CustomDataset):
+
     def __init__(
         self,
         data_root: str = "",
@@ -64,6 +65,7 @@ class IQIYIDramaNewsDataset(CustomDataset):
         return df
 
     def convert_data_to_dict(self, data) -> Dict[str, List]:
+
         def convert2token(line: str, character: str):
             tokens = []
             pattern = '\w\d'
@@ -98,27 +100,34 @@ class IQIYIDramaNewsDataset(CustomDataset):
             for i, one_line in enumerate(one_drama_df.iterrows()):
                 one_line = one_line[1]
                 if not pd.isnull(one_line["character"]):
-                    if (self.mode == "train" and not pd.isnull(one_line["emotions"])) or self.mode == "test":
+                    if (self.mode == "train" and not pd.isnull(
+                            one_line["emotions"])) or self.mode == "test":
                         test_ids_list.append(one_line["id"])
                         content = one_line["content"]
                         if one_line["character"] not in content:
                             continue
                         cht_index = content.index(one_line["character"])
                         # 上文（可选）
-                        if i - 1 >= 0 and one_line["scenario"] ==  one_drama_df.iloc[i - 1, 5]:
+                        if i - 1 >= 0 and one_line[
+                                "scenario"] == one_drama_df.iloc[i - 1, 5]:
                             past_content = one_drama_df.iloc[i - 1, 1]
                         # 下文（可选）
-                        if i < len(one_drama_df) - 1 and one_line["scenario"] ==  one_drama_df.iloc[i + 1, 5]:
+                        if i < len(one_drama_df) - 1 and one_line[
+                                "scenario"] == one_drama_df.iloc[i + 1, 5]:
                             after_content = one_drama_df.iloc[i + 1, 1]
 
-                        if past_content is not None and len(past_content + content) < self.max_seq_length:
+                        if past_content is not None and len(
+                                past_content + content) < self.max_seq_length:
                             content = past_content + content
                             cht_index += len(past_content) + 1
-                        if after_content is not None and len(content + after_content) < self.max_seq_length:
+                        if after_content is not None and len(
+                                content + after_content) < self.max_seq_length:
                             content = content + after_content
 
-                        tokens = [self.cls_token] + convert2token(content, one_line["character"]) + [self.sep_token]
-                        input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+                        tokens = [self.cls_token] + convert2token(
+                            content, one_line["character"]) + [self.sep_token]
+                        input_ids = self.tokenizer.convert_tokens_to_ids(
+                            tokens)
                         input_mask = [1] * len(input_ids)
                         input_id_list.append(input_ids)
                         input_mask_list.append(input_mask)
@@ -127,9 +136,10 @@ class IQIYIDramaNewsDataset(CustomDataset):
                         past_content = None
                         after_content = None
                         if self.mode == "train":
-                            label_list.append([int(emotion) for emotion in one_line["emotions"].split(",")])
-
-
+                            label_list.append([
+                                int(emotion)
+                                for emotion in one_line["emotions"].split(",")
+                            ])
 
         self.num_samples = len(input_id_list)
         if self.mode == "train":

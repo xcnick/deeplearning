@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Dict, Union, Any, Tuple
+from typing import Optional, Callable, Dict, Union, Any
 
 import numpy as np
 import mindspore as ms
@@ -14,6 +14,7 @@ from transformer.builder import MS_MODELS
 
 
 class MSBertEmbeddings(nn.Cell):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.token_embeddings = nn.Embedding(
@@ -33,7 +34,7 @@ class MSBertEmbeddings(nn.Cell):
             embedding_table=TruncatedNormal(config.initializer_range),
         )
 
-        self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=1e-12)
+        self.layer_norm = nn.LayerNorm((config.hidden_size, ), epsilon=1e-12)
         self.dropout = nn.Dropout(1.0 - config.hidden_dropout_prob)
 
     def construct(
@@ -54,7 +55,8 @@ class MSBertEmbeddings(nn.Cell):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
         position_embeddings = self.position_embeddings(position_ids)
 
-        embeddings = input_embeddings + position_embeddings + token_type_embeddings
+        embeddings = input_embeddings + position_embeddings + \
+            token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
 
@@ -62,6 +64,7 @@ class MSBertEmbeddings(nn.Cell):
 
 
 class MSBertPooler(nn.Cell):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = nn.Dense(
@@ -80,7 +83,9 @@ class MSBertPooler(nn.Cell):
 
 @MS_MODELS.register_module()
 class MSBertModel(MSPreTrainedModel):
-    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs) -> None:
+
+    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]],
+                 **kwargs) -> None:
         super().__init__(config, **kwargs)
         self.embeddings = MSBertEmbeddings(self.config)
         self.encoder = Encoder(
@@ -95,7 +100,10 @@ class MSBertModel(MSPreTrainedModel):
         )
         self.pooler = MSBertPooler(self.config)
 
-    def construct(self, inputs: Dict[str, ms.Tensor],) -> Dict[str, ms.Tensor]:
+    def construct(
+        self,
+        inputs: Dict[str, ms.Tensor],
+    ) -> Dict[str, ms.Tensor]:
         input_ids = None
         attention_mask = None
         token_type_ids = None
@@ -111,18 +119,24 @@ class MSBertModel(MSPreTrainedModel):
 
         if attention_mask is None:
             attention_mask = ops.ones_like(input_ids)
-        extended_attention_mask = self.get_extended_attention_mask(attention_mask)
+        extended_attention_mask = self.get_extended_attention_mask(
+            attention_mask)
 
         embeddings = self.embeddings(input_ids, token_type_ids, position_ids)
 
-        encoder_output, attention_outputs = self.encoder(embeddings, extended_attention_mask)
+        encoder_output, attention_outputs = self.encoder(
+            embeddings, extended_attention_mask)
         pooled_output = self.pooler(encoder_output)
-        output_dict = {"encoder_output": encoder_output, "pooled_output": pooled_output}
+        output_dict = {
+            "encoder_output": encoder_output,
+            "pooled_output": pooled_output
+        }
 
         return output_dict
 
 
 class MSBertPredictionHeadTransform(nn.Cell):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = nn.Dense(
@@ -131,7 +145,7 @@ class MSBertPredictionHeadTransform(nn.Cell):
             weight_init=TruncatedNormal(config.initializer_range),
         )
         self.transform_act_fn = get_activation(config.hidden_act)
-        self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=1e-12)
+        self.layer_norm = nn.LayerNorm((config.hidden_size, ), epsilon=1e-12)
 
     def construct(self, hidden_states: ms.Tensor) -> ms.Tensor:
         hidden_states = self.dense(hidden_states)
@@ -141,6 +155,7 @@ class MSBertPredictionHeadTransform(nn.Cell):
 
 
 class MSBertLMPredictionHead(nn.Cell):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.transform = MSBertPredictionHeadTransform(config)
@@ -157,6 +172,7 @@ class MSBertLMPredictionHead(nn.Cell):
 
 
 class MSBertOnlyMLMHead(nn.Cell):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.predictions = MSBertLMPredictionHead(config)
@@ -168,6 +184,7 @@ class MSBertOnlyMLMHead(nn.Cell):
 
 @MS_MODELS.register_module()
 class MSBertForPreTraining(MSPreTrainedModel):
+
     def __init__(
         self,
         config: Union[Dict[str, Any], Callable[..., None]],
@@ -180,7 +197,10 @@ class MSBertForPreTraining(MSPreTrainedModel):
         if model_path is not None:
             self._load_weights(model_path)
 
-    def construct(self, inputs=Dict[str, ms.Tensor],) -> Dict[str, ms.Tensor]:
+    def construct(
+        self,
+        inputs=Dict[str, ms.Tensor],
+    ) -> Dict[str, ms.Tensor]:
         output_dict = self.bert(inputs)
 
         prediction_scores = self.cls(output_dict["encoder_output"])
@@ -194,13 +214,17 @@ class MSBertForPreTraining(MSPreTrainedModel):
 
 
 def load_tf_weights_in_bert_to_ms(
-    model: "nn.Cell", config: Callable[..., None], tf_checkpoint_path: str, with_mlm: bool = True,
+    model: "nn.Cell",
+    config: Callable[..., None],
+    tf_checkpoint_path: str,
+    with_mlm: bool = True,
 ) -> None:
     try:
         import tensorflow as tf
         import numpy as np
     except ImportError:
-        raise ImportError("cannot import tensorflow, please install tensorflow first")
+        raise ImportError(
+            "cannot import tensorflow, please install tensorflow first")
 
     tf_model = tf.train.load_checkpoint(tf_checkpoint_path)
 
@@ -211,11 +235,13 @@ def load_tf_weights_in_bert_to_ms(
         assert param.shape == data.shape
         param.set_data(ms.Tensor(data, ms.float32))
 
-    def _load_embedding(embedding: "nn.Embedding", embedding_path: str) -> None:
+    def _load_embedding(embedding: "nn.Embedding",
+                        embedding_path: str) -> None:
         embedding_weight = _load_tf_variable(embedding_path)
         _load_ms_weight(embedding.embedding_table, embedding_weight)
 
-    def _load_layer_norm(layer_norm: "nn.LayerNorm", layer_norm_base: str) -> None:
+    def _load_layer_norm(layer_norm: "nn.LayerNorm",
+                         layer_norm_base: str) -> None:
         layer_norm_gamma = _load_tf_variable(f"{layer_norm_base}/gamma")
         layer_norm_beta = _load_tf_variable(f"{layer_norm_base}/beta")
         _load_ms_weight(layer_norm.gamma, layer_norm_gamma)
@@ -228,7 +254,8 @@ def load_tf_weights_in_bert_to_ms(
         _load_ms_weight(linear.weight, linear_weight)
         _load_ms_weight(linear.bias, linear_bias)
 
-    def _load_self_attention(attention: "nn.Cell", attention_path: str) -> None:
+    def _load_self_attention(attention: "nn.Cell",
+                             attention_path: str) -> None:
         query_weight = _load_tf_variable(f"{attention_path}/self/query/kernel")
         key_weight = _load_tf_variable(f"{attention_path}/self/key/kernel")
         value_weight = _load_tf_variable(f"{attention_path}/self/value/kernel")
@@ -251,33 +278,43 @@ def load_tf_weights_in_bert_to_ms(
 
     # loading embedding layer
     _load_embedding(
-        model.bert.embeddings.token_embeddings, "bert/embeddings/word_embeddings",
+        model.bert.embeddings.token_embeddings,
+        "bert/embeddings/word_embeddings",
     )
     _load_embedding(
-        model.bert.embeddings.token_type_embeddings, "bert/embeddings/token_type_embeddings",
+        model.bert.embeddings.token_type_embeddings,
+        "bert/embeddings/token_type_embeddings",
     )
     _load_embedding(
-        model.bert.embeddings.position_embeddings, "bert/embeddings/position_embeddings",
+        model.bert.embeddings.position_embeddings,
+        "bert/embeddings/position_embeddings",
     )
-    _load_layer_norm(model.bert.embeddings.layer_norm, "bert/embeddings/LayerNorm")
+    _load_layer_norm(model.bert.embeddings.layer_norm,
+                     "bert/embeddings/LayerNorm")
 
     # loading transformer encoders
     for layer_idx in range(config.num_hidden_layers):
         encoder_layer = model.bert.encoder.layers[layer_idx]
         encoder_path = f"bert/encoder/layer_{layer_idx}"
 
-        _load_self_attention(encoder_layer.self_attn, f"{encoder_path}/attention")
-        _load_linear(encoder_layer.self_attn.dense, f"{encoder_path}/attention/output/dense")
+        _load_self_attention(encoder_layer.self_attn,
+                             f"{encoder_path}/attention")
+        _load_linear(encoder_layer.self_attn.dense,
+                     f"{encoder_path}/attention/output/dense")
         _load_layer_norm(
-            encoder_layer.add_norm[0].layer_norm, f"{encoder_path}/attention/output/LayerNorm",
+            encoder_layer.add_norm[0].layer_norm,
+            f"{encoder_path}/attention/output/LayerNorm",
         )
 
         _load_linear(
-            encoder_layer.feed_forward.intermediate, f"{encoder_path}/intermediate/dense",
+            encoder_layer.feed_forward.intermediate,
+            f"{encoder_path}/intermediate/dense",
         )
-        _load_linear(encoder_layer.feed_forward.output, f"{encoder_path}/output/dense")
+        _load_linear(encoder_layer.feed_forward.output,
+                     f"{encoder_path}/output/dense")
         _load_layer_norm(
-            encoder_layer.add_norm[1].layer_norm, f"{encoder_path}/output/LayerNorm",
+            encoder_layer.add_norm[1].layer_norm,
+            f"{encoder_path}/output/LayerNorm",
         )
 
     _load_linear(model.bert.pooler.dense, "bert/pooler/dense")
@@ -292,39 +329,50 @@ def load_tf_weights_in_bert_to_ms(
     output_bias = _load_tf_variable("cls/predictions/output_bias")
     _load_ms_weight(model.cls.predictions.decoder.bias, output_bias)
 
-    _load_linear(model.cls.predictions.transform.dense, "cls/predictions/transform/dense")
+    _load_linear(model.cls.predictions.transform.dense,
+                 "cls/predictions/transform/dense")
     _load_layer_norm(
-        model.cls.predictions.transform.layer_norm, "cls/predictions/transform/LayerNorm",
+        model.cls.predictions.transform.layer_norm,
+        "cls/predictions/transform/LayerNorm",
     )
 
 
 def load_huggingface_weights_in_bert_to_ms(
-    model: "nn.Cell", config: Callable[..., None], pytorch_model_path: str, with_mlm: bool = True,
+    model: "nn.Cell",
+    config: Callable[..., None],
+    pytorch_model_path: str,
+    with_mlm: bool = True,
 ) -> None:
     try:
         from transformers import BertForPreTraining
         import torch
     except ImportError:
-        raise ImportError("cannot import transformers, please install transformers first")
+        raise ImportError(
+            "cannot import transformers, please install transformers first")
 
     def _load_ms_weight(param: ms.Parameter, data: np.ndarray) -> None:
         assert param.shape == data.shape
         param.set_data(ms.Tensor(data, ms.float32))
 
-    def _load_embedding(embedding: "nn.Embedding", torch_embedding: "torch.nn.Embedding") -> None:
-        _load_ms_weight(embedding.embedding_table, torch_embedding.weight.detach().numpy())
+    def _load_embedding(embedding: "nn.Embedding",
+                        torch_embedding: "torch.nn.Embedding") -> None:
+        _load_ms_weight(embedding.embedding_table,
+                        torch_embedding.weight.detach().numpy())
 
-    def _load_layer_norm(
-        ms_layer_norm: "nn.LayerNorm", torch_layer_norm: "torch.nn.LayerNorm"
-    ) -> None:
-        _load_ms_weight(ms_layer_norm.gamma, torch_layer_norm.weight.detach().numpy())
-        _load_ms_weight(ms_layer_norm.beta, torch_layer_norm.bias.detach().numpy())
+    def _load_layer_norm(ms_layer_norm: "nn.LayerNorm",
+                         torch_layer_norm: "torch.nn.LayerNorm") -> None:
+        _load_ms_weight(ms_layer_norm.gamma,
+                        torch_layer_norm.weight.detach().numpy())
+        _load_ms_weight(ms_layer_norm.beta,
+                        torch_layer_norm.bias.detach().numpy())
 
-    def _load_linear(linear: "nn.Dense", torch_linear: "torch.nn.Linear") -> None:
+    def _load_linear(linear: "nn.Dense",
+                     torch_linear: "torch.nn.Linear") -> None:
         _load_ms_weight(linear.weight, torch_linear.weight.detach().numpy())
         _load_ms_weight(linear.bias, torch_linear.bias.detach().numpy())
 
-    def _load_self_attention(attention: "nn.Dense", torch_attention: "torch.nn.Module") -> None:
+    def _load_self_attention(attention: "nn.Dense",
+                             torch_attention: "torch.nn.Module") -> None:
         _load_linear(attention.query, torch_attention.self.query)
         _load_linear(attention.key, torch_attention.self.key)
         _load_linear(attention.value, torch_attention.self.value)
@@ -332,18 +380,19 @@ def load_huggingface_weights_in_bert_to_ms(
     hf_model = BertForPreTraining.from_pretrained(pytorch_model_path)
     hf_model.eval()
 
+    _load_embedding(model.bert.embeddings.token_embeddings,
+                    hf_model.bert.embeddings.word_embeddings)
     _load_embedding(
-        model.bert.embeddings.token_embeddings, hf_model.bert.embeddings.word_embeddings
-    )
-    _load_embedding(
-        model.bert.embeddings.position_embeddings, hf_model.bert.embeddings.position_embeddings,
+        model.bert.embeddings.position_embeddings,
+        hf_model.bert.embeddings.position_embeddings,
     )
     _load_embedding(
         model.bert.embeddings.token_type_embeddings,
         hf_model.bert.embeddings.token_type_embeddings,
     )
 
-    _load_layer_norm(model.bert.embeddings.layer_norm, hf_model.bert.embeddings.LayerNorm)
+    _load_layer_norm(model.bert.embeddings.layer_norm,
+                     hf_model.bert.embeddings.LayerNorm)
 
     for layer_idx in range(config.num_hidden_layers):
         layer = model.bert.encoder.layers[layer_idx]
@@ -352,11 +401,14 @@ def load_huggingface_weights_in_bert_to_ms(
         _load_self_attention(layer.self_attn, hf_layer.attention)
 
         _load_linear(layer.self_attn.dense, hf_layer.attention.output.dense)
-        _load_linear(layer.feed_forward.intermediate, hf_layer.intermediate.dense)
+        _load_linear(layer.feed_forward.intermediate,
+                     hf_layer.intermediate.dense)
         _load_linear(layer.feed_forward.output, hf_layer.output.dense)
 
-        _load_layer_norm(layer.add_norm[0].layer_norm, hf_layer.attention.output.LayerNorm)
-        _load_layer_norm(layer.add_norm[1].layer_norm, hf_layer.output.LayerNorm)
+        _load_layer_norm(layer.add_norm[0].layer_norm,
+                         hf_layer.attention.output.LayerNorm)
+        _load_layer_norm(layer.add_norm[1].layer_norm,
+                         hf_layer.output.LayerNorm)
 
     _load_linear(model.bert.pooler.dense, hf_model.bert.pooler.dense)
 
@@ -369,11 +421,12 @@ def load_huggingface_weights_in_bert_to_ms(
         hf_model.bert.embeddings.word_embeddings.weight.detach().numpy(),
     )
     _load_ms_weight(
-        model.cls.predictions.decoder.bias, hf_model.cls.predictions.decoder.bias.detach().numpy(),
+        model.cls.predictions.decoder.bias,
+        hf_model.cls.predictions.decoder.bias.detach().numpy(),
     )
 
-    _load_linear(model.cls.predictions.transform.dense, hf_model.cls.predictions.transform.dense)
+    _load_linear(model.cls.predictions.transform.dense,
+                 hf_model.cls.predictions.transform.dense)
 
-    _load_layer_norm(
-        model.cls.predictions.transform.layer_norm, hf_model.cls.predictions.transform.LayerNorm
-    )
+    _load_layer_norm(model.cls.predictions.transform.layer_norm,
+                     hf_model.cls.predictions.transform.LayerNorm)

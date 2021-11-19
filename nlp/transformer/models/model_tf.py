@@ -41,7 +41,8 @@ class TFBertForSequenceClassification(TFPreTrainedModel):
         self.dropout = tf.keras.layers.Dropout(self.config.hidden_dropout_prob)
         self.classifier = tf.keras.layers.Dense(
             self.num_labels,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation=None,
             name="dense",
         )
@@ -50,8 +51,7 @@ class TFBertForSequenceClassification(TFPreTrainedModel):
             self.loss_fct = tf.keras.losses.MeanSquaredError()
         else:
             self.loss_fct = tf.keras.losses.SparseCategoricalCrossentropy(
-                from_logits=True, reduction=tf.keras.losses.Reduction.NONE
-            )
+                from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
 
         self.acc_fct = tf.keras.metrics.SparseCategoricalAccuracy()
         if model_path is not None:
@@ -65,7 +65,9 @@ class TFBertForSequenceClassification(TFPreTrainedModel):
         self.load_weights(model_path)
 
     def call(
-        self, inputs: Dict[str, tf.Tensor], training: Optional[bool] = False,
+        self,
+        inputs: Dict[str, tf.Tensor],
+        training: Optional[bool] = False,
     ) -> Tuple[tf.Tensor, ...]:
         labels = inputs.get("label_id")
         bert_output = self.bert(inputs)
@@ -78,11 +80,12 @@ class TFBertForSequenceClassification(TFPreTrainedModel):
 
         if labels is not None:
             if self.num_labels == 1:
-                loss = self.loss_fct(tf.reshape(logits, (-1,)), tf.reshape(labels, (-1,)))
+                loss = self.loss_fct(
+                    tf.reshape(logits, (-1, )), tf.reshape(labels, (-1, )))
             else:
                 loss = self.loss_fct(
-                    tf.reshape(labels, (-1,)), tf.reshape(logits, (-1, self.num_labels))
-                )
+                    tf.reshape(labels, (-1, )),
+                    tf.reshape(logits, (-1, self.num_labels)))
             output_dict.update({"loss": loss})
             self.add_loss(loss)
             self.add_metric(self.acc_fct(labels, logits))
@@ -125,37 +128,43 @@ class TFBertForIQIYIDrama(TFPreTrainedModel):
         self.dropout = tf.keras.layers.Dropout(self.config.hidden_dropout_prob)
         self.classifier1 = tf.keras.layers.Dense(
             self.num_labels,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation=None,
             name="dense1",
         )
         self.classifier2 = tf.keras.layers.Dense(
             self.num_labels,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation=None,
             name="dense2",
         )
         self.classifier3 = tf.keras.layers.Dense(
             self.num_labels,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation=None,
             name="dense3",
         )
         self.classifier4 = tf.keras.layers.Dense(
             self.num_labels,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation=None,
             name="dense4",
         )
         self.classifier5 = tf.keras.layers.Dense(
             self.num_labels,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation=None,
             name="dense5",
         )
         self.classifier6 = tf.keras.layers.Dense(
             self.num_labels,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation=None,
             name="dense6",
         )
@@ -171,8 +180,7 @@ class TFBertForIQIYIDrama(TFPreTrainedModel):
         )
 
         self.loss_fct = tf.keras.losses.CategoricalCrossentropy(
-            reduction=tf.keras.losses.Reduction.NONE
-        )
+            reduction=tf.keras.losses.Reduction.NONE)
 
         self.acc_fct = tf.keras.metrics.RootMeanSquaredError()
         if model_path is not None:
@@ -187,7 +195,9 @@ class TFBertForIQIYIDrama(TFPreTrainedModel):
         self.load_weights(model_path)
 
     def call(
-        self, inputs: Dict[str, tf.Tensor], training: Optional[bool] = False,
+        self,
+        inputs: Dict[str, tf.Tensor],
+        training: Optional[bool] = False,
     ) -> Tuple[tf.Tensor, ...]:
         labels = inputs.get("labels")
         cht_indices = inputs.get("cht_indices")
@@ -195,7 +205,8 @@ class TFBertForIQIYIDrama(TFPreTrainedModel):
         bert_output = self.bert(inputs)
 
         encoder_output = bert_output["encoder_output"]
-        cht_output = tf.gather(encoder_output, cht_indices, axis=1, batch_dims=1)
+        cht_output = tf.gather(
+            encoder_output, cht_indices, axis=1, batch_dims=1)
         logits1 = tf.keras.activations.sigmoid(self.classifier1(cht_output))
         logits2 = tf.keras.activations.sigmoid(self.classifier2(cht_output))
         logits3 = tf.keras.activations.sigmoid(self.classifier3(cht_output))
@@ -220,19 +231,43 @@ class TFBertForIQIYIDrama(TFPreTrainedModel):
             logits5 = tf.cast(logits5, tf.float32)
             logits6 = tf.cast(logits6, tf.float32)
             new_labels = tf.gather(self.label_indexs, labels, axis=0)
-            loss1 = self.loss_fct(new_labels[:, 0], tf.reshape(logits1, (-1, self.num_labels)))
-            loss2 = self.loss_fct(new_labels[:, 1], tf.reshape(logits2, (-1, self.num_labels)))
-            loss3 = self.loss_fct(new_labels[:, 2], tf.reshape(logits3, (-1, self.num_labels)))
-            loss4 = self.loss_fct(new_labels[:, 3], tf.reshape(logits4, (-1, self.num_labels)))
-            loss5 = self.loss_fct(new_labels[:, 4], tf.reshape(logits5, (-1, self.num_labels)))
-            loss6 = self.loss_fct(new_labels[:, 5], tf.reshape(logits6, (-1, self.num_labels)))
+            loss1 = self.loss_fct(new_labels[:, 0],
+                                  tf.reshape(logits1, (-1, self.num_labels)))
+            loss2 = self.loss_fct(new_labels[:, 1],
+                                  tf.reshape(logits2, (-1, self.num_labels)))
+            loss3 = self.loss_fct(new_labels[:, 2],
+                                  tf.reshape(logits3, (-1, self.num_labels)))
+            loss4 = self.loss_fct(new_labels[:, 3],
+                                  tf.reshape(logits4, (-1, self.num_labels)))
+            loss5 = self.loss_fct(new_labels[:, 4],
+                                  tf.reshape(logits5, (-1, self.num_labels)))
+            loss6 = self.loss_fct(new_labels[:, 5],
+                                  tf.reshape(logits6, (-1, self.num_labels)))
             # 可选，将label为0的loss变小10倍
-            loss1 = tf.where(tf.reduce_all(tf.equal(new_labels[:, 0], [0.8, 0.6, 0.4, 0.2]), axis=-1), loss1 * 0.1, loss1)
-            loss2 = tf.where(tf.reduce_all(tf.equal(new_labels[:, 1], [0.8, 0.6, 0.4, 0.2]), axis=-1), loss2 * 0.1, loss2)
-            loss3 = tf.where(tf.reduce_all(tf.equal(new_labels[:, 2], [0.8, 0.6, 0.4, 0.2]), axis=-1), loss3 * 0.1, loss3)
-            loss4 = tf.where(tf.reduce_all(tf.equal(new_labels[:, 3], [0.8, 0.6, 0.4, 0.2]), axis=-1), loss4 * 0.1, loss4)
-            loss5 = tf.where(tf.reduce_all(tf.equal(new_labels[:, 4], [0.8, 0.6, 0.4, 0.2]), axis=-1), loss5 * 0.1, loss5)
-            loss6 = tf.where(tf.reduce_all(tf.equal(new_labels[:, 5], [0.8, 0.6, 0.4, 0.2]), axis=-1), loss6 * 0.1, loss6)
+            loss1 = tf.where(
+                tf.reduce_all(
+                    tf.equal(new_labels[:, 0], [0.8, 0.6, 0.4, 0.2]), axis=-1),
+                loss1 * 0.1, loss1)
+            loss2 = tf.where(
+                tf.reduce_all(
+                    tf.equal(new_labels[:, 1], [0.8, 0.6, 0.4, 0.2]), axis=-1),
+                loss2 * 0.1, loss2)
+            loss3 = tf.where(
+                tf.reduce_all(
+                    tf.equal(new_labels[:, 2], [0.8, 0.6, 0.4, 0.2]), axis=-1),
+                loss3 * 0.1, loss3)
+            loss4 = tf.where(
+                tf.reduce_all(
+                    tf.equal(new_labels[:, 3], [0.8, 0.6, 0.4, 0.2]), axis=-1),
+                loss4 * 0.1, loss4)
+            loss5 = tf.where(
+                tf.reduce_all(
+                    tf.equal(new_labels[:, 4], [0.8, 0.6, 0.4, 0.2]), axis=-1),
+                loss5 * 0.1, loss5)
+            loss6 = tf.where(
+                tf.reduce_all(
+                    tf.equal(new_labels[:, 5], [0.8, 0.6, 0.4, 0.2]), axis=-1),
+                loss6 * 0.1, loss6)
             loss = loss1 + loss2 + loss3 + loss4 + loss5 + loss6
             output_dict.update({"loss": loss})
             self.add_loss(loss)
@@ -290,14 +325,17 @@ class TFBertForIQIYIDramaRegress(TFPreTrainedModel):
         self.dropout = tf.keras.layers.Dropout(self.config.hidden_dropout_prob)
         self.regresstion = tf.keras.layers.Dense(
             6,
-            kernel_initializer=tf.keras.initializers.RandomNormal(stddev=1.0e-5),
+            kernel_initializer=tf.keras.initializers.RandomNormal(
+                stddev=1.0e-5),
             activation=None,
             name="dense",
         )
 
-        self.regress_labels = tf.constant([0.2, 0.4, 0.6, 0.8], dtype=tf.float32)
+        self.regress_labels = tf.constant([0.2, 0.4, 0.6, 0.8],
+                                          dtype=tf.float32)
 
-        # self.loss_fct = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+        # self.loss_fct \
+        #   = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
 
         self.acc_fct = tf.keras.metrics.RootMeanSquaredError()
         if model_path is not None:
@@ -312,7 +350,9 @@ class TFBertForIQIYIDramaRegress(TFPreTrainedModel):
         self.load_weights(model_path)
 
     def call(
-        self, inputs: Dict[str, tf.Tensor], training: Optional[bool] = False,
+        self,
+        inputs: Dict[str, tf.Tensor],
+        training: Optional[bool] = False,
     ) -> Tuple[tf.Tensor, ...]:
         labels = inputs.get("labels")
         cht_indices = inputs.get("cht_indices")
@@ -320,7 +360,8 @@ class TFBertForIQIYIDramaRegress(TFPreTrainedModel):
         bert_output = self.bert(inputs)
 
         encoder_output = bert_output["encoder_output"]
-        cht_output = tf.gather(encoder_output, cht_indices, axis=1, batch_dims=1)
+        cht_output = tf.gather(
+            encoder_output, cht_indices, axis=1, batch_dims=1)
         logits = tf.keras.activations.relu(self.regresstion(cht_output))
 
         output_dict = {
@@ -335,9 +376,12 @@ class TFBertForIQIYIDramaRegress(TFPreTrainedModel):
             # loss = self.loss_fct(new_labels, logits)
             loss = tf.pow(tf.subtract(new_labels, logits), 2)
 
-            label_count = tf.reduce_sum(tf.cast(tf.equal(new_labels, 0.2), dtype=tf.int32))
+            label_count = tf.reduce_sum(
+                tf.cast(tf.equal(new_labels, 0.2), dtype=tf.int32))
             all_size = tf.size(new_labels)
-            factor = tf.subtract(1.0, tf.cast(tf.divide(label_count, all_size), dtype=tf.float32))
+            factor = tf.subtract(
+                1.0,
+                tf.cast(tf.divide(label_count, all_size), dtype=tf.float32))
             loss = tf.where(tf.equal(new_labels, 0.2), loss * factor, loss)
             loss = tf.reduce_mean(loss)
 
@@ -350,8 +394,7 @@ class TFBertForIQIYIDramaRegress(TFPreTrainedModel):
                     tf.subtract(
                         tf.expand_dims(logits, axis=-1),
                         tf.cast(self.regress_labels, dtype=logits.dtype),
-                    )
-                ),
+                    )),
                 axis=-1,
             )
 

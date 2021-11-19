@@ -1,8 +1,9 @@
 from abc import ABCMeta, abstractmethod
-from typing import List, Any, Dict
+from typing import List, Dict
 
 
 class CustomDataset(metaclass=ABCMeta):
+
     def __init__(self):
         pass
 

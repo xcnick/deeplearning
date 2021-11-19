@@ -22,10 +22,13 @@ for gpu in gpus:
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a transformer")
     parser.add_argument("--config", type=str, help="train config file path")
-    parser.add_argument("--train_url", type=str, help="the dir to save logs and models")
     parser.add_argument(
-        "--fp16", default=False, action="store_true", help="whether to use mixed precision"
-    )
+        "--train_url", type=str, help="the dir to save logs and models")
+    parser.add_argument(
+        "--fp16",
+        default=False,
+        action="store_true",
+        help="whether to use mixed precision")
     args = parser.parse_args()
 
     return args
@@ -45,7 +48,8 @@ def _adjust_lr(cfg: dict, num_replicas: int):
                 callback["base_lr"] *= num_replicas
 
 
-def _adjust_batchsize(cfg: dict, num_replicas: int, num_train_samples: int, num_val_samples: int):
+def _adjust_batchsize(cfg: dict, num_replicas: int, num_train_samples: int,
+                      num_val_samples: int):
     samples_per_gpu = cfg.dict["data"]["samples_per_gpu"]
     global_batch_size = num_replicas * samples_per_gpu
     for i in range(len(cfg.dict["train_pipeline"]) - 1, -1, -1):
@@ -54,7 +58,8 @@ def _adjust_batchsize(cfg: dict, num_replicas: int, num_train_samples: int, num_
             break
 
     if cfg.dict["train_cfg"]["steps_per_epoch"] == 0:
-        cfg.dict["train_cfg"]["steps_per_epoch"] = num_train_samples // global_batch_size + 1
+        cfg.dict["train_cfg"][
+            "steps_per_epoch"] = num_train_samples // global_batch_size + 1
 
     # val
     if "val_pipeline" in cfg.dict:
@@ -63,7 +68,8 @@ def _adjust_batchsize(cfg: dict, num_replicas: int, num_train_samples: int, num_
                 cfg.dict["val_pipeline"][i]["batch_size"] = global_batch_size
                 break
         if cfg.dict["train_cfg"]["val_steps"] == 0:
-            cfg.dict["train_cfg"]["val_steps"] = num_val_samples // global_batch_size + 1
+            cfg.dict["train_cfg"][
+                "val_steps"] = num_val_samples // global_batch_size + 1
 
 
 def _adjust_callback(cfg: dict, train_url: str = None):
@@ -79,16 +85,16 @@ def _adjust_callback(cfg: dict, train_url: str = None):
                     epochs=cfg.dict["train_cfg"]["epochs"],
                     steps_per_epoch=cfg.dict["train_cfg"]["steps_per_epoch"],
                     val_steps=cfg.dict["train_cfg"]["val_steps"],
-                )
-            )
+                ))
         elif callback["type"] == "TensorBoardLogger":
             callback["log_dir"] = os.path.join(train_url, callback["log_dir"])
         elif callback["type"] == "ModelCheckpoint":
-            callback["filepath"] = os.path.join(train_url, callback["filepath"])
+            callback["filepath"] = os.path.join(train_url,
+                                                callback["filepath"])
         elif callback["type"].endswith("LRScheduler"):
             callback["total_steps"] = (
-                cfg.dict["train_cfg"]["epochs"] * cfg.dict["train_cfg"]["steps_per_epoch"]
-            )
+                cfg.dict["train_cfg"]["epochs"] *
+                cfg.dict["train_cfg"]["steps_per_epoch"])
 
 
 def main():
@@ -97,7 +103,8 @@ def main():
     cfg = Config.fromfile(args.config)
 
     time_str = time.strftime("%Y%m%d%H%M%S", time.localtime(time.time()))
-    get_root_logger(log_file=os.path.join(args.train_url, f"train_{time_str}.log"))
+    get_root_logger(
+        log_file=os.path.join(args.train_url, f"train_{time_str}.log"))
 
     if args.fp16:
         from tensorflow.keras import mixed_precision
@@ -111,7 +118,7 @@ def main():
 
     with mirrored_strategy.scope():
         model = build_tf_models(cfg.dict["model"])
-        model.compile(optimizer=train_optimizer,)
+        model.compile(optimizer=train_optimizer, )
 
     train_dataset_obj = build_datasets(cfg.dict["data"]["train"])
     val_dataset_obj = build_datasets(cfg.dict["data"]["val"])
@@ -149,7 +156,7 @@ def main():
     for callback in cfg.dict["callbacks"]:
         callback_list.append(build_tf_callbacks(callback))
 
-    history = model.fit(
+    model.fit(
         x=train_dataset,
         epochs=cfg.dict["train_cfg"]["epochs"],
         steps_per_epoch=cfg.dict["train_cfg"]["steps_per_epoch"],

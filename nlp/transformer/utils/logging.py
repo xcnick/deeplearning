@@ -4,7 +4,8 @@ logger_initialized = {}
 
 
 def get_root_logger(log_file=None, log_level=logging.INFO):
-    logger = get_logger(name="transformer", log_file=log_file, log_level=log_level)
+    logger = get_logger(
+        name="transformer", log_file=log_file, log_level=log_level)
 
     return logger
 
@@ -43,7 +44,8 @@ def get_logger(name, log_file=None, log_level=logging.INFO, file_mode="w"):
         file_handler = logging.FileHandler(log_file, file_mode)
         handlers.append(file_handler)
 
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     for handler in handlers:
         handler.setFormatter(formatter)
         handler.setLevel(log_level)
@@ -76,7 +78,5 @@ def print_log(msg, logger=None, level=logging.INFO):
         _logger = get_logger(logger)
         _logger.log(level, msg)
     else:
-        raise TypeError(
-            "logger should be either a logging.Logger object, str"
-            f" or None, but got {type(logger)}"
-        )
+        raise TypeError("logger should be either a logging.Logger object, str"
+                        f" or None, but got {type(logger)}")

@@ -8,28 +8,33 @@ from transformer.builder import TF_MODELS
 
 
 class TFBertEmbeddings(tf.keras.layers.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.token_embeddings = tf.keras.layers.Embedding(
             config.vocab_size,
             config.hidden_size,
-            embeddings_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            embeddings_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             name="token_embeddings",
         )
         self.position_embeddings = tf.keras.layers.Embedding(
             config.max_position_embeddings,
             config.hidden_size,
-            embeddings_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            embeddings_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             name="position_embeddings",
         )
         self.token_type_embeddings = tf.keras.layers.Embedding(
             config.type_vocab_size,
             config.hidden_size,
-            embeddings_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            embeddings_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             name="token_type_embeddings",
         )
 
-        self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-12, name="LayerNorm")
+        self.layer_norm = tf.keras.layers.LayerNormalization(
+            epsilon=1e-12, name="LayerNorm")
         self.dropout = tf.keras.layers.Dropout(config.hidden_dropout_prob)
 
     def call(
@@ -50,7 +55,8 @@ class TFBertEmbeddings(tf.keras.layers.Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
         position_embeddings = self.position_embeddings(position_ids)
 
-        embeddings = input_embeddings + position_embeddings + token_type_embeddings
+        embeddings = input_embeddings + position_embeddings + \
+            token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
 
@@ -58,11 +64,13 @@ class TFBertEmbeddings(tf.keras.layers.Layer):
 
 
 class TFBertPooler(tf.keras.layers.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = tf.keras.layers.Dense(
             config.hidden_size,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             activation="tanh",
             name="dense",
         )
@@ -75,7 +83,9 @@ class TFBertPooler(tf.keras.layers.Layer):
 
 @TF_MODELS.register_module()
 class TFBertModel(TFPreTrainedModel):
-    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs) -> None:
+
+    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]],
+                 **kwargs) -> None:
         super().__init__(config, **kwargs)
         self.embeddings = TFBertEmbeddings(self.config)
         self.encoder = TFEncoder(
@@ -90,7 +100,9 @@ class TFBertModel(TFPreTrainedModel):
         self.pooler = TFBertPooler(self.config)
 
     def call(
-        self, inputs: Dict[str, tf.Tensor], training: Optional[bool] = False,
+        self,
+        inputs: Dict[str, tf.Tensor],
+        training: Optional[bool] = False,
     ) -> Dict[str, tf.Tensor]:
         input_ids = inputs.get("input_ids")
         attention_mask = inputs.get("attention_mask")
@@ -100,36 +112,42 @@ class TFBertModel(TFPreTrainedModel):
         if attention_mask is None:
             attention_mask = tf.ones_like(input_ids)
 
-        embeddings = self.embeddings(input_ids, token_type_ids, position_ids, training=training)
+        embeddings = self.embeddings(
+            input_ids, token_type_ids, position_ids, training=training)
 
         extended_attention_mask = attention_mask[:, tf.newaxis, tf.newaxis, :]
-        extended_attention_mask = tf.cast(extended_attention_mask, dtype=embeddings.dtype)
+        extended_attention_mask = tf.cast(
+            extended_attention_mask, dtype=embeddings.dtype)
         one_cst = tf.constant(1.0, dtype=embeddings.dtype)
         ten_thousand_cst = tf.constant(-10000.0, dtype=embeddings.dtype)
         # extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         extended_attention_mask = tf.multiply(
-            tf.subtract(one_cst, extended_attention_mask), ten_thousand_cst
-        )
+            tf.subtract(one_cst, extended_attention_mask), ten_thousand_cst)
 
         encoder_output, attention_output = self.encoder(
-            embeddings, extended_attention_mask, training=training
-        )
+            embeddings, extended_attention_mask, training=training)
         pooled_output = self.pooler(encoder_output)
-        output_dict = {"encoder_output": encoder_output, "pooled_output": pooled_output}
+        output_dict = {
+            "encoder_output": encoder_output,
+            "pooled_output": pooled_output
+        }
 
         return output_dict
 
 
 class TFBertPredictionHeadTransform(tf.keras.layers.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = tf.keras.layers.Dense(
             config.hidden_size,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             name="dense",
         )
         self.transform_act_fn = get_activation(config.hidden_act)
-        self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-12, name="layer_norm")
+        self.layer_norm = tf.keras.layers.LayerNormalization(
+            epsilon=1e-12, name="layer_norm")
 
     def call(self, hidden_states: tf.Tensor) -> tf.Tensor:
         hidden_states = self.dense(hidden_states)
@@ -139,12 +157,14 @@ class TFBertPredictionHeadTransform(tf.keras.layers.Layer):
 
 
 class TFBertLMPredictionHead(tf.keras.layers.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.transform = TFBertPredictionHeadTransform(config)
         self.decoder = tf.keras.layers.Dense(
             config.vocab_size,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.02),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(
+                stddev=0.02),
             name="dense",
         )
 
@@ -155,6 +175,7 @@ class TFBertLMPredictionHead(tf.keras.layers.Layer):
 
 
 class TFBertOnlyMLMHead(tf.keras.layers.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.predictions = TFBertLMPredictionHead(config)
@@ -166,6 +187,7 @@ class TFBertOnlyMLMHead(tf.keras.layers.Layer):
 
 @TF_MODELS.register_module()
 class TFBertForPreTraining(TFPreTrainedModel):
+
     def __init__(
         self,
         config: Union[Dict[str, Any], Callable[..., None]],
@@ -178,9 +200,9 @@ class TFBertForPreTraining(TFPreTrainedModel):
         if model_path is not None:
             self._load_weights(model_path)
 
-    def call(
-        self, inputs=Dict[str, tf.Tensor], training: Optional[bool] = False
-    ) -> Dict[str, tf.Tensor]:
+    def call(self,
+             inputs=Dict[str, tf.Tensor],
+             training: Optional[bool] = False) -> Dict[str, tf.Tensor]:
         output_dict = self.bert(inputs, training=training)
 
         prediction_scores = self.cls(output_dict["encoder_output"])
@@ -206,7 +228,8 @@ def load_tf_weights_in_bert_to_tf(
         import tensorflow as tf
         import numpy as np
     except ImportError:
-        raise ImportError("cannot import tensorflow, please install tensorflow first")
+        raise ImportError(
+            "cannot import tensorflow, please install tensorflow first")
 
     tf_model = tf.train.load_checkpoint(tf_checkpoint_path)
 
@@ -248,15 +271,19 @@ def load_tf_weights_in_bert_to_tf(
 
     # loading embedding layer
     _load_embedding(
-        model.bert.embeddings.token_embeddings, "bert/embeddings/word_embeddings",
+        model.bert.embeddings.token_embeddings,
+        "bert/embeddings/word_embeddings",
     )
     _load_embedding(
-        model.bert.embeddings.token_type_embeddings, "bert/embeddings/token_type_embeddings",
+        model.bert.embeddings.token_type_embeddings,
+        "bert/embeddings/token_type_embeddings",
     )
     _load_embedding(
-        model.bert.embeddings.position_embeddings, "bert/embeddings/position_embeddings",
+        model.bert.embeddings.position_embeddings,
+        "bert/embeddings/position_embeddings",
     )
-    _load_layer_norm(model.bert.embeddings.layer_norm, "bert/embeddings/LayerNorm")
+    _load_layer_norm(model.bert.embeddings.layer_norm,
+                     "bert/embeddings/LayerNorm")
 
     # loading transformer encoders
     for layer_idx in range(config.num_hidden_layers):
@@ -264,17 +291,22 @@ def load_tf_weights_in_bert_to_tf(
         encoder_path = f"bert/encoder/layer_{layer_idx}"
 
         _load_self_attention(encoder_layer.self, f"{encoder_path}/attention")
-        _load_linear(encoder_layer.self.dense, f"{encoder_path}/attention/output/dense")
+        _load_linear(encoder_layer.self.dense,
+                     f"{encoder_path}/attention/output/dense")
         _load_layer_norm(
-            encoder_layer.add_norm[0].layer_norm, f"{encoder_path}/attention/output/LayerNorm",
+            encoder_layer.add_norm[0].layer_norm,
+            f"{encoder_path}/attention/output/LayerNorm",
         )
 
         _load_linear(
-            encoder_layer.feed_forward.intermediate, f"{encoder_path}/intermediate/dense",
+            encoder_layer.feed_forward.intermediate,
+            f"{encoder_path}/intermediate/dense",
         )
-        _load_linear(encoder_layer.feed_forward.dense, f"{encoder_path}/output/dense")
+        _load_linear(encoder_layer.feed_forward.dense,
+                     f"{encoder_path}/output/dense")
         _load_layer_norm(
-            encoder_layer.add_norm[1].layer_norm, f"{encoder_path}/output/LayerNorm",
+            encoder_layer.add_norm[1].layer_norm,
+            f"{encoder_path}/output/LayerNorm",
         )
 
     _load_linear(model.bert.pooler.dense, "bert/pooler/dense")
@@ -286,11 +318,14 @@ def load_tf_weights_in_bert_to_tf(
     output_embeddings = _load_tf_variable("bert/embeddings/word_embeddings")
     output_embeddings = np.transpose(output_embeddings)
     output_bias = _load_tf_variable("cls/predictions/output_bias")
-    _set_weights(model.cls.predictions.decoder, [output_embeddings, output_bias])
+    _set_weights(model.cls.predictions.decoder,
+                 [output_embeddings, output_bias])
 
-    _load_linear(model.cls.predictions.transform.dense, "cls/predictions/transform/dense")
+    _load_linear(model.cls.predictions.transform.dense,
+                 "cls/predictions/transform/dense")
     _load_layer_norm(
-        model.cls.predictions.transform.layer_norm, "cls/predictions/transform/LayerNorm",
+        model.cls.predictions.transform.layer_norm,
+        "cls/predictions/transform/LayerNorm",
     )
 
 
@@ -303,7 +338,8 @@ def load_huggingface_weights_in_bert_to_tf(
     try:
         from transformers import BertForPreTraining
     except ImportError:
-        raise ImportError("cannot import transformers, please install transformers first")
+        raise ImportError(
+            "cannot import transformers, please install transformers first")
 
     def _set_weights(param, weight_list):
         assert len(param.weights) == len(weight_list)
@@ -322,7 +358,10 @@ def load_huggingface_weights_in_bert_to_tf(
     )
     _set_weights(
         model.bert.embeddings.token_type_embeddings,
-        [hf_model.bert.embeddings.token_type_embeddings.weight.detach().numpy()],
+        [
+            hf_model.bert.embeddings.token_type_embeddings.weight.detach().
+            numpy()
+        ],
     )
 
     _set_weights(
@@ -340,7 +379,8 @@ def load_huggingface_weights_in_bert_to_tf(
         _set_weights(
             layer.self.query,
             [
-                hf_layer.attention.self.query.weight.detach().transpose(0, 1).numpy(),
+                hf_layer.attention.self.query.weight.detach().transpose(
+                    0, 1).numpy(),
                 hf_layer.attention.self.query.bias.detach().numpy(),
             ],
         )
@@ -348,7 +388,8 @@ def load_huggingface_weights_in_bert_to_tf(
         _set_weights(
             layer.self.key,
             [
-                hf_layer.attention.self.key.weight.detach().transpose(0, 1).numpy(),
+                hf_layer.attention.self.key.weight.detach().transpose(
+                    0, 1).numpy(),
                 hf_layer.attention.self.key.bias.detach().numpy(),
             ],
         )
@@ -356,7 +397,8 @@ def load_huggingface_weights_in_bert_to_tf(
         _set_weights(
             layer.self.value,
             [
-                hf_layer.attention.self.value.weight.detach().transpose(0, 1).numpy(),
+                hf_layer.attention.self.value.weight.detach().transpose(
+                    0, 1).numpy(),
                 hf_layer.attention.self.value.bias.detach().numpy(),
             ],
         )
@@ -364,7 +406,8 @@ def load_huggingface_weights_in_bert_to_tf(
         _set_weights(
             layer.self.dense,
             [
-                hf_layer.attention.output.dense.weight.detach().transpose(0, 1).numpy(),
+                hf_layer.attention.output.dense.weight.detach().transpose(
+                    0, 1).numpy(),
                 hf_layer.attention.output.dense.bias.detach().numpy(),
             ],
         )
@@ -372,7 +415,8 @@ def load_huggingface_weights_in_bert_to_tf(
         _set_weights(
             layer.feed_forward.intermediate,
             [
-                hf_layer.intermediate.dense.weight.detach().transpose(0, 1).numpy(),
+                hf_layer.intermediate.dense.weight.detach().transpose(
+                    0, 1).numpy(),
                 hf_layer.intermediate.dense.bias.detach().numpy(),
             ],
         )
@@ -416,7 +460,8 @@ def load_huggingface_weights_in_bert_to_tf(
     _set_weights(
         model.cls.predictions.decoder,
         [
-            hf_model.bert.embeddings.word_embeddings.weight.detach().transpose(0, 1).numpy(),
+            hf_model.bert.embeddings.word_embeddings.weight.detach().transpose(
+                0, 1).numpy(),
             hf_model.cls.predictions.decoder.bias.detach().numpy(),
         ],
     )
@@ -424,7 +469,8 @@ def load_huggingface_weights_in_bert_to_tf(
     _set_weights(
         model.cls.predictions.transform.dense,
         [
-            hf_model.cls.predictions.transform.dense.weight.detach().transpose(0, 1).numpy(),
+            hf_model.cls.predictions.transform.dense.weight.detach().transpose(
+                0, 1).numpy(),
             hf_model.cls.predictions.transform.dense.bias.detach().numpy(),
         ],
     )
@@ -432,7 +478,8 @@ def load_huggingface_weights_in_bert_to_tf(
     _set_weights(
         model.cls.predictions.transform.layer_norm,
         [
-            hf_model.cls.predictions.transform.LayerNorm.weight.detach().numpy(),
+            hf_model.cls.predictions.transform.LayerNorm.weight.detach().numpy(
+            ),
             hf_model.cls.predictions.transform.LayerNorm.bias.detach().numpy(),
         ],
     )

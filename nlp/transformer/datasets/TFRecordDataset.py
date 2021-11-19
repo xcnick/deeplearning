@@ -1,13 +1,14 @@
 import tensorflow as tf
 from tensorflow.python.data.ops import dataset_ops
 
-from typing import Union, List, Any, Dict
+from typing import Union, List
 
 from transformer.builder import DATASETS
 
 
 @DATASETS.register_module()
 class TFRecordDataset:
+
     def __init__(
         self,
         filenames: Union[List[str], str],

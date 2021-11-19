@@ -8,6 +8,7 @@ from .utils_pd import get_activation
 
 
 class PDEncoder(nn.Layer):
+
     def __init__(
         self,
         num_hidden_layers: int,
@@ -19,22 +20,21 @@ class PDEncoder(nn.Layer):
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.layers = nn.LayerList(
-            [
-                EncoderLayer(
-                    hidden_size,
-                    num_attention_heads,
-                    intermediate_size,
-                    attention_probs_dropout_prob,
-                    hidden_dropout_prob,
-                    hidden_act,
-                )
-                for _ in range(num_hidden_layers)
-            ]
-        )
+        self.layers = nn.LayerList([
+            EncoderLayer(
+                hidden_size,
+                num_attention_heads,
+                intermediate_size,
+                attention_probs_dropout_prob,
+                hidden_dropout_prob,
+                hidden_act,
+            ) for _ in range(num_hidden_layers)
+        ])
 
     def forward(
-        self, x: paddle.Tensor, mask: Optional[paddle.Tensor] = None
+        self,
+        x: paddle.Tensor,
+        mask: Optional[paddle.Tensor] = None
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         for layer in self.layers:
             x, attn = layer(x, mask)
@@ -42,6 +42,7 @@ class PDEncoder(nn.Layer):
 
 
 class EncoderLayer(nn.Layer):
+
     def __init__(
         self,
         hidden_size: int,
@@ -52,18 +53,19 @@ class EncoderLayer(nn.Layer):
         hidden_act: str = "relu",
     ) -> None:
         super().__init__()
-        self.self = MultiHeadAttention(
-            hidden_size, num_attention_heads, attention_probs_dropout_prob
-        )
-        self.feed_forward = PositionwiseFeedForward(
-            hidden_size, intermediate_size, hidden_dropout_prob, hidden_act
-        )
+        self.self = MultiHeadAttention(hidden_size, num_attention_heads,
+                                       attention_probs_dropout_prob)
+        self.feed_forward = PositionwiseFeedForward(hidden_size,
+                                                    intermediate_size,
+                                                    hidden_dropout_prob,
+                                                    hidden_act)
         self.add_norm = nn.LayerList(
-            [AddNormLayer(hidden_size, hidden_dropout_prob) for _ in range(2)]
-        )
+            [AddNormLayer(hidden_size, hidden_dropout_prob) for _ in range(2)])
 
     def forward(
-        self, x: paddle.Tensor, mask: Optional[paddle.Tensor] = None
+        self,
+        x: paddle.Tensor,
+        mask: Optional[paddle.Tensor] = None
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         x1, attn = self.self(x, x, x, mask)
         x = self.add_norm[0](x, x1)
@@ -73,7 +75,10 @@ class EncoderLayer(nn.Layer):
 
 
 class AddNormLayer(nn.Layer):
-    def __init__(self, hidden_size: int, hidden_dropout_prob: float = 0.1) -> None:
+
+    def __init__(self,
+                 hidden_size: int,
+                 hidden_dropout_prob: float = 0.1) -> None:
         super().__init__()
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=1e-12)
         self.dropout = nn.Dropout(hidden_dropout_prob)
@@ -83,6 +88,7 @@ class AddNormLayer(nn.Layer):
 
 
 class PositionwiseFeedForward(nn.Layer):
+
     def __init__(
         self,
         hidden_size: int,
@@ -97,10 +103,13 @@ class PositionwiseFeedForward(nn.Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self, x: paddle.Tensor) -> paddle.Tensor:
-        return self.output(self.dropout(get_activation(self.hidden_act)(self.intermediate(x))))
+        return self.output(
+            self.dropout(
+                get_activation(self.hidden_act)(self.intermediate(x))))
 
 
 class MultiHeadAttention(nn.Layer):
+
     def __init__(
         self,
         hidden_size: int = 768,
@@ -116,7 +125,8 @@ class MultiHeadAttention(nn.Layer):
         self.key = nn.Linear(hidden_size, hidden_size)
         self.value = nn.Linear(hidden_size, hidden_size)
 
-        self.attention = ScaledDotProductAttention(attention_probs_dropout_prob)
+        self.attention = ScaledDotProductAttention(
+            attention_probs_dropout_prob)
         self.dense = nn.Linear(hidden_size, hidden_size)
 
     def forward(
@@ -133,24 +143,25 @@ class MultiHeadAttention(nn.Layer):
         value = self.value(value)
 
         # multi head
-        query = query.reshape((batch_size, -1, self.num_attention_heads, self.dims_per_head)).transpose(
-            (0, 2, 1, 3)
-        )
-        key = key.reshape((batch_size, -1, self.num_attention_heads, self.dims_per_head)).transpose((0, 2, 1, 3))
-        value = value.reshape((batch_size, -1, self.num_attention_heads, self.dims_per_head)).transpose(
-            (0, 2, 1, 3)
-        )
+        query = query.reshape((batch_size, -1, self.num_attention_heads,
+                               self.dims_per_head)).transpose((0, 2, 1, 3))
+        key = key.reshape((batch_size, -1, self.num_attention_heads,
+                           self.dims_per_head)).transpose((0, 2, 1, 3))
+        value = value.reshape((batch_size, -1, self.num_attention_heads,
+                               self.dims_per_head)).transpose((0, 2, 1, 3))
 
         # self attention
         context, attention = self.attention(query, key, value, attn_mask=mask)
         # concat heads
-        context = context.transpose((0, 2, 1, 3)).reshape((batch_size, -1, self.hidden_size))
+        context = context.transpose((0, 2, 1, 3)).reshape(
+            (batch_size, -1, self.hidden_size))
         output = self.dense(context)
 
         return output, attention
 
 
 class ScaledDotProductAttention(nn.Layer):
+
     def __init__(self, attention_probs_dropout_prob: float = 0.1) -> None:
         super().__init__()
         self.dropout = nn.Dropout(attention_probs_dropout_prob)

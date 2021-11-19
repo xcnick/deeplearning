@@ -8,6 +8,7 @@ from .utils import round_float_to_str
 
 @TF_CALLBACKS.register_module()
 class TextLogger(tf.keras.callbacks.Callback):
+
     def __init__(
         self,
         print_freq: int = 50,
@@ -33,10 +34,9 @@ class TextLogger(tf.keras.callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         if self.print_summary:
-            summary_log = (
-                f"Train for {self.epochs} epochs with {self.steps_per_epoch} "
-                f"steps per epoch, validate for {self.val_steps} steps"
-            )
+            summary_log = (f"Train for {self.epochs} epochs with "
+                           f"{self.steps_per_epoch} steps per epoch, "
+                           f"validate for {self.val_steps} steps")
             print_log(summary_log, self.logger)
 
         self.logs_history = {k: None for k in self.model.metrics_names}
@@ -51,7 +51,8 @@ class TextLogger(tf.keras.callbacks.Callback):
         batch += 1
         self._update_logs(logs=logs)
         if batch % self.print_freq == 0 or batch == self.steps_per_epoch:
-            base_log = f"Epoch [{self.global_epoch}/{self.epochs}][{batch}/{self.steps_per_epoch}]"
+            base_log = f"Epoch [{self.global_epoch}/{self.epochs}]"\
+                       f"[{batch}/{self.steps_per_epoch}]"
             metric_log = []
             for key_, value_ in self.logs_history.items():
                 if value_ is None:
@@ -84,11 +85,13 @@ class TextLogger(tf.keras.callbacks.Callback):
         logs = {"val_" + k: v for k, v in logs.items()}
         self._update_val_logs(logs=logs)
         self.val_logs_history = {
-            key_: np.mean(value_) for key_, value_ in self.val_logs_history.items()
+            key_: np.mean(value_)
+            for key_, value_ in self.val_logs_history.items()
         }
-        # we only print evaluation logs in `on_test_end` when calling `model.evaluate()`,
-        # otherwise (calling `model.fit()`) the evaluation logs will be updated to epoch log
-        # and print in `on_epoch_end`.
+        # we only print evaluation logs in `on_test_end`
+        # when calling `model.evaluate()`,
+        # otherwise (calling `model.fit()`) the evaluation logs
+        # will be updated to epoch log and print in `on_epoch_end`.
         # if not self._is_fit:
         metric_log = []
         for key_, value_ in self.val_logs_history.items():

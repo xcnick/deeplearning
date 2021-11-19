@@ -9,11 +9,15 @@ from transformer.builder import PD_MODELS
 
 
 class PDBertEmbeddings(nn.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
-        self.token_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=0)
-        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
-        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.token_embeddings = nn.Embedding(
+            config.vocab_size, config.hidden_size, padding_idx=0)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings,
+                                                config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size,
+                                                  config.hidden_size)
 
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=1e-12)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -28,16 +32,19 @@ class PDBertEmbeddings(nn.Layer):
         seq_length = input_shape[1]
 
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype=paddle.long, device=input_ids.device)
+            token_type_ids = paddle.zeros(
+                input_shape, dtype=paddle.long, device=input_ids.device)
         if position_ids is None:
-            position_ids = paddle.arange(seq_length, dtype=paddle.long, device=input_ids.device)
+            position_ids = paddle.arange(
+                seq_length, dtype=paddle.long, device=input_ids.device)
             position_ids = position_ids.unsqueeze(0).expand(input_shape)
 
         input_embeddings = self.token_embeddings(input_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
         position_embeddings = self.position_embeddings(position_ids)
 
-        embeddings = input_embeddings + position_embeddings + token_type_embeddings
+        embeddings = input_embeddings + position_embeddings + \
+            token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
 
@@ -45,6 +52,7 @@ class PDBertEmbeddings(nn.Layer):
 
 
 class PDBertPooler(nn.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
@@ -59,7 +67,9 @@ class PDBertPooler(nn.Layer):
 
 @PD_MODELS.register_module()
 class PDBertModel(PDPreTrainedModel):
-    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]], **kwargs) -> None:
+
+    def __init__(self, config: Union[Dict[str, Any], Callable[..., None]],
+                 **kwargs) -> None:
         super().__init__(config, **kwargs)
         self.embeddings = PDBertEmbeddings(self.config)
         self.encoder = PDEncoder(
@@ -73,7 +83,10 @@ class PDBertModel(PDPreTrainedModel):
         )
         self.pooler = PDBertPooler(self.config)
 
-    def forward(self, inputs: Dict[str, paddle.Tensor],) -> Dict[str, paddle.Tensor]:
+    def forward(
+        self,
+        inputs: Dict[str, paddle.Tensor],
+    ) -> Dict[str, paddle.Tensor]:
         input_ids = inputs.get("input_ids")
         attention_mask = inputs.get("attention_mask")
         token_type_ids = inputs.get("token_type_ids")
@@ -82,17 +95,24 @@ class PDBertModel(PDPreTrainedModel):
         embeddings = self.embeddings(input_ids, token_type_ids, position_ids)
 
         if attention_mask is None:
-            attention_mask = paddle.ones_like(input_ids, device=input_ids.device)
-        extended_attention_mask = self.get_extended_attention_mask(attention_mask, input_ids)
+            attention_mask = paddle.ones_like(
+                input_ids, device=input_ids.device)
+        extended_attention_mask = self.get_extended_attention_mask(
+            attention_mask, input_ids)
 
-        encoder_output, attention_output = self.encoder(embeddings, extended_attention_mask)
+        encoder_output, attention_output = self.encoder(
+            embeddings, extended_attention_mask)
         pooled_output = self.pooler(encoder_output)
-        output_dict = {"encoder_output": encoder_output, "pooled_output": pooled_output}
+        output_dict = {
+            "encoder_output": encoder_output,
+            "pooled_output": pooled_output
+        }
 
         return output_dict
 
 
 class PDBertPredictionHeadTransform(nn.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
@@ -107,6 +127,7 @@ class PDBertPredictionHeadTransform(nn.Layer):
 
 
 class PDBertLMPredictionHead(nn.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.transform = PDBertPredictionHeadTransform(config)
@@ -119,6 +140,7 @@ class PDBertLMPredictionHead(nn.Layer):
 
 
 class PDBertOnlyMLMHead(nn.Layer):
+
     def __init__(self, config: Callable[..., None]) -> None:
         super().__init__()
         self.predictions = PDBertLMPredictionHead(config)
@@ -130,6 +152,7 @@ class PDBertOnlyMLMHead(nn.Layer):
 
 @PD_MODELS.register_module()
 class PDBertForPreTraining(PDPreTrainedModel):
+
     def __init__(
         self,
         config: Union[Dict[str, Any], Callable[..., None]],
@@ -142,7 +165,10 @@ class PDBertForPreTraining(PDPreTrainedModel):
         if model_path is not None:
             self._load_weights(model_path)
 
-    def forward(self, inputs=Dict[str, paddle.Tensor],) -> Dict[str, paddle.Tensor]:
+    def forward(
+        self,
+        inputs=Dict[str, paddle.Tensor],
+    ) -> Dict[str, paddle.Tensor]:
         output_dict = self.bert(inputs)
 
         prediction_scores = self.cls(output_dict["encoder_output"])
@@ -156,13 +182,17 @@ class PDBertForPreTraining(PDPreTrainedModel):
 
 
 def load_tf_weights_in_bert(
-    model: "nn.Layer", config: Callable[..., None], tf_checkpoint_path: str, with_mlm: bool = True,
+    model: "nn.Layer",
+    config: Callable[..., None],
+    tf_checkpoint_path: str,
+    with_mlm: bool = True,
 ) -> None:
     try:
         import tensorflow as tf
         import numpy as np
     except ImportError:
-        raise ImportError("cannot import tensorflow, please install tensorflow first")
+        raise ImportError(
+            "cannot import tensorflow, please install tensorflow first")
 
     tf_model = tf.train.load_checkpoint(tf_checkpoint_path)
 
@@ -173,11 +203,13 @@ def load_tf_weights_in_bert(
         assert param.shape == list(data.shape)
         param.set_value(data.astype(np.float32))
 
-    def _load_embedding(embedding: "nn.Embedding", embedding_path: str) -> None:
+    def _load_embedding(embedding: "nn.Embedding",
+                        embedding_path: str) -> None:
         embedding_weight = _load_tf_variable(embedding_path)
         _load_paddle_weight(embedding.weight, embedding_weight)
 
-    def _load_layer_norm(layer_norm: "nn.LayerNorm", layer_norm_base: str) -> None:
+    def _load_layer_norm(layer_norm: "nn.LayerNorm",
+                         layer_norm_base: str) -> None:
         layer_norm_gamma = _load_tf_variable(f"{layer_norm_base}/gamma")
         layer_norm_beta = _load_tf_variable(f"{layer_norm_base}/beta")
         _load_paddle_weight(layer_norm.weight, layer_norm_gamma)
@@ -189,7 +221,8 @@ def load_tf_weights_in_bert(
         _load_paddle_weight(linear.weight, linear_weight)
         _load_paddle_weight(linear.bias, linear_bias)
 
-    def _load_self_attention(attention: "nn.Layer", attention_path: str) -> None:
+    def _load_self_attention(attention: "nn.Layer",
+                             attention_path: str) -> None:
         query_weight = _load_tf_variable(f"{attention_path}/self/query/kernel")
         key_weight = _load_tf_variable(f"{attention_path}/self/key/kernel")
         value_weight = _load_tf_variable(f"{attention_path}/self/value/kernel")
@@ -208,15 +241,19 @@ def load_tf_weights_in_bert(
 
     # loading embedding layer
     _load_embedding(
-        model.bert.embeddings.token_embeddings, "bert/embeddings/word_embeddings",
+        model.bert.embeddings.token_embeddings,
+        "bert/embeddings/word_embeddings",
     )
     _load_embedding(
-        model.bert.embeddings.token_type_embeddings, "bert/embeddings/token_type_embeddings",
+        model.bert.embeddings.token_type_embeddings,
+        "bert/embeddings/token_type_embeddings",
     )
     _load_embedding(
-        model.bert.embeddings.position_embeddings, "bert/embeddings/position_embeddings",
+        model.bert.embeddings.position_embeddings,
+        "bert/embeddings/position_embeddings",
     )
-    _load_layer_norm(model.bert.embeddings.layer_norm, "bert/embeddings/LayerNorm")
+    _load_layer_norm(model.bert.embeddings.layer_norm,
+                     "bert/embeddings/LayerNorm")
 
     # loading transformer encoders
     for layer_idx in range(config.num_hidden_layers):
@@ -224,17 +261,22 @@ def load_tf_weights_in_bert(
         encoder_path = f"bert/encoder/layer_{layer_idx}"
 
         _load_self_attention(encoder_layer.self, f"{encoder_path}/attention")
-        _load_linear(encoder_layer.self.dense, f"{encoder_path}/attention/output/dense")
+        _load_linear(encoder_layer.self.dense,
+                     f"{encoder_path}/attention/output/dense")
         _load_layer_norm(
-            encoder_layer.add_norm[0].layer_norm, f"{encoder_path}/attention/output/LayerNorm",
+            encoder_layer.add_norm[0].layer_norm,
+            f"{encoder_path}/attention/output/LayerNorm",
         )
 
         _load_linear(
-            encoder_layer.feed_forward.intermediate, f"{encoder_path}/intermediate/dense",
+            encoder_layer.feed_forward.intermediate,
+            f"{encoder_path}/intermediate/dense",
         )
-        _load_linear(encoder_layer.feed_forward.output, f"{encoder_path}/output/dense")
+        _load_linear(encoder_layer.feed_forward.output,
+                     f"{encoder_path}/output/dense")
         _load_layer_norm(
-            encoder_layer.add_norm[1].layer_norm, f"{encoder_path}/output/LayerNorm",
+            encoder_layer.add_norm[1].layer_norm,
+            f"{encoder_path}/output/LayerNorm",
         )
 
     _load_linear(model.bert.pooler.dense, "bert/pooler/dense")
@@ -244,61 +286,82 @@ def load_tf_weights_in_bert(
         return
 
     decoder_weight = _load_tf_variable("bert/embeddings/word_embeddings")
-    _load_paddle_weight(model.cls.predictions.decoder.weight, np.transpose(decoder_weight))
+    _load_paddle_weight(model.cls.predictions.decoder.weight,
+                        np.transpose(decoder_weight))
 
     output_bias = _load_tf_variable("cls/predictions/output_bias")
     _load_paddle_weight(model.cls.predictions.decoder.bias, output_bias)
 
-    _load_linear(model.cls.predictions.transform.dense, "cls/predictions/transform/dense")
+    _load_linear(model.cls.predictions.transform.dense,
+                 "cls/predictions/transform/dense")
     _load_layer_norm(
-        model.cls.predictions.transform.layer_norm, "cls/predictions/transform/LayerNorm",
+        model.cls.predictions.transform.layer_norm,
+        "cls/predictions/transform/LayerNorm",
     )
 
 
 def load_huggingface_weights_in_bert(
-    model: "nn.Layer", config: Callable[..., None], torch_model_path: str, with_mlm: bool = True,
+    model: "nn.Layer",
+    config: Callable[..., None],
+    torch_model_path: str,
+    with_mlm: bool = True,
 ) -> None:
     try:
         from transformers import BertForPreTraining
     except ImportError:
-        raise ImportError("cannot import transformers, please install transformers first")
+        raise ImportError(
+            "cannot import transformers, please install transformers first")
 
     import numpy as np
+    import torch
 
     def _load_paddle_weight(param: paddle.Tensor, data: np.ndarray):
         assert param.shape == list(data.shape)
         param.set_value(data.astype(np.float32))
 
-    def _load_embedding(embedding: "nn.Embedding", torch_embedding: "torch.nn.Embedding") -> None:
-        _load_paddle_weight(embedding.weight, torch_embedding.weight.detach().numpy())
+    def _load_embedding(embedding: "nn.Embedding",
+                        torch_embedding: "torch.nn.Embedding") -> None:
+        _load_paddle_weight(embedding.weight,
+                            torch_embedding.weight.detach().numpy())
 
-    def _load_layer_norm(
-        layer_norm: "nn.LayerNorm", torch_layer_norm: "torch.nn.LayerNorm"
-    ) -> None:
-        _load_paddle_weight(layer_norm.weight, torch_layer_norm.weight.detach().numpy())
-        _load_paddle_weight(layer_norm.bias, torch_layer_norm.bias.detach().numpy())
+    def _load_layer_norm(layer_norm: "nn.LayerNorm",
+                         torch_layer_norm: "torch.nn.LayerNorm") -> None:
+        _load_paddle_weight(layer_norm.weight,
+                            torch_layer_norm.weight.detach().numpy())
+        _load_paddle_weight(layer_norm.bias,
+                            torch_layer_norm.bias.detach().numpy())
 
-    def _load_linear(linear: "nn.Linear", torch_linear: "torch.nn.Linear") -> None:
-        _load_paddle_weight(linear.weight, torch_linear.weight.transpose(-1, 0).detach().numpy())
-        _load_paddle_weight(linear.bias, torch_linear.bias.transpose(-1, 0).detach().numpy())
+    def _load_linear(linear: "nn.Linear",
+                     torch_linear: "torch.nn.Linear") -> None:
+        _load_paddle_weight(
+            linear.weight,
+            torch_linear.weight.transpose(-1, 0).detach().numpy())
+        _load_paddle_weight(
+            linear.bias,
+            torch_linear.bias.transpose(-1, 0).detach().numpy())
 
-    def _load_self_attention(attention: "nn.Linear", torch_attention: "torch.nn.Module") -> None:
+    def _load_self_attention(attention: "nn.Linear",
+                             torch_attention: "torch.nn.Module") -> None:
         _load_linear(attention.query, torch_attention.self.query)
         _load_linear(attention.key, torch_attention.self.key)
         _load_linear(attention.value, torch_attention.self.value)
 
     hf_model = BertForPreTraining.from_pretrained(torch_model_path)
     _load_embedding(
-        model.bert.embeddings.token_embeddings, hf_model.bert.embeddings.word_embeddings,
+        model.bert.embeddings.token_embeddings,
+        hf_model.bert.embeddings.word_embeddings,
     )
     _load_embedding(
-        model.bert.embeddings.position_embeddings, hf_model.bert.embeddings.position_embeddings,
+        model.bert.embeddings.position_embeddings,
+        hf_model.bert.embeddings.position_embeddings,
     )
     _load_embedding(
-        model.bert.embeddings.token_type_embeddings, hf_model.bert.embeddings.token_type_embeddings,
+        model.bert.embeddings.token_type_embeddings,
+        hf_model.bert.embeddings.token_type_embeddings,
     )
 
-    _load_layer_norm(model.bert.embeddings.layer_norm, hf_model.bert.embeddings.LayerNorm)
+    _load_layer_norm(model.bert.embeddings.layer_norm,
+                     hf_model.bert.embeddings.LayerNorm)
 
     for layer_idx in range(config.num_hidden_layers):
         layer = model.bert.encoder.layers[layer_idx]
@@ -307,11 +370,14 @@ def load_huggingface_weights_in_bert(
         _load_self_attention(layer.self, hf_layer.attention)
 
         _load_linear(layer.self.dense, hf_layer.attention.output.dense)
-        _load_linear(layer.feed_forward.intermediate, hf_layer.intermediate.dense)
+        _load_linear(layer.feed_forward.intermediate,
+                     hf_layer.intermediate.dense)
         _load_linear(layer.feed_forward.output, hf_layer.output.dense)
 
-        _load_layer_norm(layer.add_norm[0].layer_norm, hf_layer.attention.output.LayerNorm)
-        _load_layer_norm(layer.add_norm[1].layer_norm, hf_layer.output.LayerNorm)
+        _load_layer_norm(layer.add_norm[0].layer_norm,
+                         hf_layer.attention.output.LayerNorm)
+        _load_layer_norm(layer.add_norm[1].layer_norm,
+                         hf_layer.output.LayerNorm)
 
     _load_linear(model.bert.pooler.dense, hf_model.bert.pooler.dense)
 
@@ -321,14 +387,14 @@ def load_huggingface_weights_in_bert(
 
     _load_paddle_weight(
         model.cls.predictions.decoder.weight,
-        hf_model.bert.embeddings.word_embeddings.weight.transpose(-1, 0).detach().numpy(),
+        hf_model.bert.embeddings.word_embeddings.weight.transpose(
+            -1, 0).detach().numpy(),
     )
-    _load_paddle_weight(
-        model.cls.predictions.decoder.bias, hf_model.cls.predictions.decoder.bias.detach().numpy()
-    )
+    _load_paddle_weight(model.cls.predictions.decoder.bias,
+                        hf_model.cls.predictions.decoder.bias.detach().numpy())
 
-    _load_linear(model.cls.predictions.transform.dense, hf_model.cls.predictions.transform.dense)
+    _load_linear(model.cls.predictions.transform.dense,
+                 hf_model.cls.predictions.transform.dense)
 
-    _load_layer_norm(
-        model.cls.predictions.transform.layer_norm, hf_model.cls.predictions.transform.LayerNorm
-    )
+    _load_layer_norm(model.cls.predictions.transform.layer_norm,
+                     hf_model.cls.predictions.transform.LayerNorm)

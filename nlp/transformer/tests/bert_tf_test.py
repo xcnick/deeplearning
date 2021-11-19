@@ -16,6 +16,7 @@ for gpu in gpus:
 
 
 class TestTFBertModel:
+
     @classmethod
     def setup_class(cls):
         cls.config_file_path = "/workspace/models/nlp/chinese_wwm_ext/bert_config.json"
@@ -29,21 +30,29 @@ class TestTFBertModel:
         cls.config = build_config(model_cfg["config"])
         cls.model_tf = build_tf_models(model_cfg)
         cls.model_hf = build_tf_models(model_cfg)
-        cls.model_base = transformers.BertModel.from_pretrained(cls.huggingface_model_path)
+        cls.model_base = transformers.BertModel.from_pretrained(
+            cls.huggingface_model_path)
         cls.model_base.eval()
         cls.model_base_mlm = transformers.BertForPreTraining.from_pretrained(
-            cls.huggingface_model_path
-        )
+            cls.huggingface_model_path)
         cls.model_base_mlm.eval()
         model_cfg.update({"model_path": cls.model_path})
         cls.model = build_tf_models(model_cfg)
         cls.batch_size = 4
         cls.seq_length = 10
         cls.tokens_tensor = {
-            "input_ids": tf.random.uniform(shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
-            "attention_mask": tf.random.uniform(shape=(4, 10), minval=0, maxval=2, dtype=tf.int32),
-            "token_type_ids": tf.random.uniform(shape=(4, 10), minval=0, maxval=2, dtype=tf.int32),
-            "position_ids": tf.random.uniform(shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
+            "input_ids":
+            tf.random.uniform(
+                shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
+            "attention_mask":
+            tf.random.uniform(
+                shape=(4, 10), minval=0, maxval=2, dtype=tf.int32),
+            "token_type_ids":
+            tf.random.uniform(
+                shape=(4, 10), minval=0, maxval=2, dtype=tf.int32),
+            "position_ids":
+            tf.random.uniform(
+                shape=(4, 10), minval=1, maxval=10, dtype=tf.int32),
         }
 
     @classmethod
@@ -68,37 +77,44 @@ class TestTFBertModel:
         encoder_output = output_dict["encoder_output"]
         pooled_output = output_dict["pooled_output"]
         prediction_scores = output_dict["prediction_scores"]
-        assert encoder_output.shape == (self.batch_size, self.seq_length, self.config.hidden_size)
-        assert pooled_output.shape == (self.batch_size, self.config.hidden_size)
-        assert prediction_scores.shape == (self.batch_size, self.seq_length, self.config.vocab_size)
+        assert encoder_output.shape == (self.batch_size, self.seq_length,
+                                        self.config.hidden_size)
+        assert pooled_output.shape == (self.batch_size,
+                                       self.config.hidden_size)
+        assert prediction_scores.shape == (self.batch_size, self.seq_length,
+                                           self.config.vocab_size)
 
     def test_tf_and_huggingface_compare(self):
         self.model_tf(self.tokens_tensor)
         load_tf_weights_in_bert_to_tf(
-            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True
-        )
+            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
 
         self.model_hf(self.tokens_tensor)
         load_huggingface_weights_in_bert_to_tf(
-            self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
-        )
+            self.model_hf,
+            self.config,
+            self.huggingface_model_path,
+            with_mlm=True)
 
-        for tf_param, pt_param in zip(self.model_tf.weights, self.model_hf.weights):
+        for tf_param, pt_param in zip(self.model_tf.weights,
+                                      self.model_hf.weights):
             assert tf.reduce_all(tf.equal(tf_param.numpy(), pt_param.numpy()))
 
-        for tf_param, pt_param in zip(self.model_tf.weights, self.model.weights):
+        for tf_param, pt_param in zip(self.model_tf.weights,
+                                      self.model.weights):
             assert tf.reduce_all(tf.equal(tf_param.numpy(), pt_param.numpy()))
 
     def test_model_forward(self):
         self.model_tf(self.tokens_tensor)
         load_tf_weights_in_bert_to_tf(
-            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True
-        )
+            self.model_tf, self.config, self.tf_checkpoint_path, with_mlm=True)
 
         self.model_hf(self.tokens_tensor)
         load_huggingface_weights_in_bert_to_tf(
-            self.model_hf, self.config, self.huggingface_model_path, with_mlm=True
-        )
+            self.model_hf,
+            self.config,
+            self.huggingface_model_path,
+            with_mlm=True)
 
         output_dict_tf = self.model_tf(self.tokens_tensor)
         output_dict_hf = self.model_hf(self.tokens_tensor)
@@ -119,29 +135,44 @@ class TestTFBertModel:
             output_dict["prediction_scores"],
         )
         base_output = self.model_base(
-            torch.tensor(self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
-            torch.tensor(self.tokens_tensor["attention_mask"].numpy(), dtype=torch.long),
-            torch.tensor(self.tokens_tensor["token_type_ids"].numpy(), dtype=torch.long),
-            torch.tensor(self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["attention_mask"].numpy(),
+                dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["token_type_ids"].numpy(),
+                dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
             return_dict=True,
         )
         base_mlm_output = self.model_base_mlm(
-            torch.tensor(self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
-            torch.tensor(self.tokens_tensor["attention_mask"].numpy(), dtype=torch.long),
-            torch.tensor(self.tokens_tensor["token_type_ids"].numpy(), dtype=torch.long),
-            torch.tensor(self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["input_ids"].numpy(), dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["attention_mask"].numpy(),
+                dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["token_type_ids"].numpy(),
+                dtype=torch.long),
+            torch.tensor(
+                self.tokens_tensor["position_ids"].numpy(), dtype=torch.long),
             return_dict=True,
         )
 
         last_hidden_state = base_output["last_hidden_state"].detach().numpy()
         pooler_output = base_output["pooler_output"].detach().numpy()
-        prediction_logits = base_mlm_output["prediction_logits"].detach().numpy()
+        prediction_logits = base_mlm_output["prediction_logits"].detach(
+        ).numpy()
 
-        assert tf.reduce_max(tf.abs(hf_encoder_output - last_hidden_state)) < 1e-3
+        assert tf.reduce_max(
+            tf.abs(hf_encoder_output - last_hidden_state)) < 1e-3
         assert tf.reduce_max(tf.abs(hf_pooled_output - pooler_output)) < 1e-3
         assert tf.reduce_max(tf.abs(hf_mlm_output - prediction_logits)) < 1e-2
 
-        assert tf.reduce_max(tf.abs(tf_encoder_output - last_hidden_state)) < 1e-3
+        assert tf.reduce_max(
+            tf.abs(tf_encoder_output - last_hidden_state)) < 1e-3
         assert tf.reduce_max(tf.abs(tf_pooled_output - pooler_output)) < 1e-3
         assert tf.reduce_max(tf.abs(tf_mlm_output - prediction_logits)) < 1e-2
 

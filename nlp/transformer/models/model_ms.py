@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Dict
 import mindspore as ms
 import mindspore.nn as nn
 from mindspore.common.initializer import TruncatedNormal
@@ -51,7 +51,8 @@ class MSBertForSequenceClassification(MSPreTrainedModel):
         if self.num_labels == 1:
             self.loss_fct = nn.MSELoss()
         else:
-            self.loss_fct = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction="mean")
+            self.loss_fct = nn.SoftmaxCrossEntropyWithLogits(
+                sparse=True, reduction="mean")
 
         # self.acc_fct = tf.keras.metrics.SparseCategoricalAccuracy()
         if model_path is not None:
@@ -61,11 +62,11 @@ class MSBertForSequenceClassification(MSPreTrainedModel):
         param_dict = load_checkpoint(model_path)
         load_param_into_net(self, param_dict)
 
-    def construct(
-        self, input_ids: ms.Tensor, attention_mask: ms.Tensor, label_id: ms.Tensor
-    ) -> Tuple[ms.Tensor, ...]:
+    def construct(self, input_ids: ms.Tensor, attention_mask: ms.Tensor,
+                  label_id: ms.Tensor) -> Tuple[ms.Tensor, ...]:
         labels = label_id
-        _, pooled_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        _, pooled_output = self.bert(
+            input_ids=input_ids, attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -74,10 +75,13 @@ class MSBertForSequenceClassification(MSPreTrainedModel):
 
         if labels is not None:
             if self.num_labels == 1:
-                loss = self.loss_fct(logits.reshape((-1,)), labels.reshape((-1,)))
+                loss = self.loss_fct(
+                    logits.reshape((-1, )), labels.reshape((-1, )))
             else:
-                loss = self.loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
-            outputs = outputs + (loss,)
+                loss = self.loss_fct(
+                    logits.reshape((-1, self.num_labels)),
+                    labels.reshape((-1, )))
+            outputs = outputs + (loss, )
             # self.add_loss(loss)
             # self.add_metric(self.acc_fct(labels, logits))
 

@@ -37,7 +37,10 @@ class InputFeatures(object):
 @DATASETS.register_module()
 class THUCNewsDataset(CustomDataset):
 
-    labels = ["财经", "彩票", "房产", "股票", "家居", "教育", "科技", "社会", "时尚", "时政", "体育", "星座", "游戏", "娱乐"]
+    labels = [
+        "财经", "彩票", "房产", "股票", "家居", "教育", "科技", "社会", "时尚", "时政", "体育", "星座",
+        "游戏", "娱乐"
+    ]
     label_map = {label: i for i, label in enumerate(labels)}
 
     def __init__(
@@ -72,7 +75,8 @@ class THUCNewsDataset(CustomDataset):
         # 需要先调用 get_data_dict
         return self.num_samples
 
-    def read_data_from_files(self, data_root: str, mode: str) -> List[InputExample]:
+    def read_data_from_files(self, data_root: str,
+                             mode: str) -> List[InputExample]:
         file_path = os.path.join(data_root, "{}.txt".format(mode))
         guid_index = 1
         examples = []
@@ -82,12 +86,15 @@ class THUCNewsDataset(CustomDataset):
                 label = splits[0]
                 text = splits[-1].replace("\n", "")
                 examples.append(
-                    InputExample(guid="{}-{}".format(mode, guid_index), text=text, label=label)
-                )
+                    InputExample(
+                        guid="{}-{}".format(mode, guid_index),
+                        text=text,
+                        label=label))
                 guid_index += 1
         return examples
 
-    def convert_data_to_dict(self, examples: List[InputExample]) -> Dict[str, List]:
+    def convert_data_to_dict(self,
+                             examples: List[InputExample]) -> Dict[str, List]:
         input_id_list = []
         input_mask_list = []
         label_list = []
@@ -96,7 +103,8 @@ class THUCNewsDataset(CustomDataset):
                 print(f"{ex_i} of {len(examples)}")
             tokens = self.tokenizer.tokenize(example.text)
             if len(tokens) > (self.max_seq_length - self.special_tokens_count):
-                tokens = tokens[: (self.max_seq_length - self.special_tokens_count)]
+                tokens = tokens[:(self.max_seq_length -
+                                  self.special_tokens_count)]
             tokens = [self.cls_token] + tokens + [self.sep_token]
 
             input_ids = self.tokenizer.convert_tokens_to_ids(tokens)

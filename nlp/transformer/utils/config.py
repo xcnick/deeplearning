@@ -8,18 +8,19 @@ import json
 import tempfile
 from importlib import import_module
 
-
 BASE_KEY = "_base_"
 DELETE_KEY = "_delete_"
 RESERVED_KEYS = ["filename", "text", "pretty_text"]
 
 
 class Config:
+
     def __init__(self, cfg_dict=None, cfg_text=None, filename=None):
         if cfg_dict is None:
             cfg_dict = dict()
         elif not isinstance(cfg_dict, dict):
-            raise TypeError("cfg_dict must be a dict, but " f"got {type(cfg_dict)}")
+            raise TypeError("cfg_dict must be a dict, but "
+                            f"got {type(cfg_dict)}")
         for key in cfg_dict:
             if key in RESERVED_KEYS:
                 raise KeyError(f"{key} is reserved for config file")
@@ -42,7 +43,8 @@ class Config:
         try:
             ast.parse(content)
         except SyntaxError as e:
-            raise SyntaxError("There are syntax errors in config " f"file {filename}: {e}")
+            raise SyntaxError("There are syntax errors in config "
+                              f"file {filename}: {e}")
 
     @staticmethod
     def _file2dict(filename):
@@ -53,7 +55,8 @@ class Config:
             raise IOError("Only py/json type are supported now!")
 
         with tempfile.TemporaryDirectory() as temp_config_dir:
-            temp_config_file = tempfile.NamedTemporaryFile(dir=temp_config_dir, suffix=fileExtname)
+            temp_config_file = tempfile.NamedTemporaryFile(
+                dir=temp_config_dir, suffix=fileExtname)
             if platform.system() == "Windows":
                 temp_config_file.close()
             temp_config_name = osp.basename(temp_config_file.name)
@@ -66,7 +69,9 @@ class Config:
                 mod = import_module(temp_module_name)
                 sys.path.pop(0)
                 cfg_dict = {
-                    name: value for name, value in mod.__dict__.items() if not name.startswith("__")
+                    name: value
+                    for name, value in mod.__dict__.items()
+                    if not name.startswith("__")
                 }
                 # delete imported module
                 del sys.modules[temp_module_name]
@@ -84,7 +89,8 @@ class Config:
         if BASE_KEY in cfg_dict:
             cfg_dir = osp.dirname(filename)
             base_filename = cfg_dict.pop(BASE_KEY)
-            base_filename = base_filename if isinstance(base_filename, list) else [base_filename]
+            base_filename = base_filename if isinstance(
+                base_filename, list) else [base_filename]
 
             cfg_dict_list = list()
             cfg_text_list = list()
@@ -142,15 +148,15 @@ class Config:
                 if len(b) <= k:
                     raise KeyError(f"Index {k} exceeds the length of list {b}")
                 b[k] = Config._merge_a_into_b(v, b[k], allow_list_keys)
-            elif isinstance(v, dict) and k in b and not v.pop(DELETE_KEY, False):
+            elif isinstance(v,
+                            dict) and k in b and not v.pop(DELETE_KEY, False):
                 allowed_types = (dict, list) if allow_list_keys else dict
                 if not isinstance(b[k], allowed_types):
                     raise TypeError(
                         f"{k}={v} in child config cannot inherit from base "
                         f"because {k} is a dict in the child config but is of "
                         f"type {type(b[k])} in base config. You may set "
-                        f"`{DELETE_KEY}=True` to ignore the base config"
-                    )
+                        f"`{DELETE_KEY}=True` to ignore the base config")
                 b[k] = Config._merge_a_into_b(v, b[k], allow_list_keys)
             else:
                 b[k] = v
