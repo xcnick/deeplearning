@@ -1,17 +1,17 @@
 # Transformer
 
-- 基于Transformer实现的各种预训练模型，包含：
+- 基于 Transformer 实现的各种预训练模型，包含：
   - Bert
   - Albert
   - Electra
   - GPT2
   - TTA
-- 使用 PyTorch / TensorFlow2.0 / MindSpore 实现
+- 使用 PyTorch / TensorFlow2.0 / MindSpore / OneFlow / Paddle 实现
 - 仅包含基本的模型实现，下游任务需自行定义网络模型
 
 ## 转换脚本
 
-支持从 TensorFlow 版本模型和 Huggingface PyTorch 版本模型转换为 TensorFlow ckpt 模型、PyTorch 模型、MindSpore 。
+支持从 TensorFlow 版本模型和 Huggingface PyTorch 版本模型转换为 TensorFlow ckpt 模型、PyTorch 模型、MindSpore 模型、OneFlow 模型、Paddle 模型。
 
 ```
 python convert_weights.py --model_type bert \

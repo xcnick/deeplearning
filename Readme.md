@@ -1,4 +1,4 @@
-# Deeplearning项目
+# Deeplearning 项目
 
 ## [autodiff](autodiff)
 
@@ -25,7 +25,3 @@
 ## [Reinforcement Learning](rl)
 
 - [omrl](rl/omrl)，强化学习框架，使用配置文件形式管理算法、模型、参数等。
-
-## [docs](docs)
-
-- 算法和系统笔记文档

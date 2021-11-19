@@ -34,7 +34,7 @@ class MSBertEmbeddings(nn.Cell):
         )
 
         self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=1e-12)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dropout = nn.Dropout(1.0 - config.hidden_dropout_prob)
 
     def construct(
         self,

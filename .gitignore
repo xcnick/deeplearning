@@ -140,3 +140,5 @@ serialization_dir
 debug.env
 
 outputs
+
+third_party

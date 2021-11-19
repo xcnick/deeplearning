@@ -81,7 +81,7 @@ class AddNormLayer(nn.Cell):
     def __init__(self, hidden_size: int, hidden_dropout_prob: int = 0.1) -> None:
         super().__init__()
         self.layer_norm = nn.LayerNorm((hidden_size,), epsilon=1e-12)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dropout = nn.Dropout(1.0 - hidden_dropout_prob)
 
     def construct(self, x: ms.Tensor, x1: ms.Tensor) -> ms.Tensor:
         return self.layer_norm(x + self.dropout(x1))
@@ -104,7 +104,7 @@ class PositionwiseFeedForward(nn.Cell):
         self.output = nn.Dense(
             intermediate_size, hidden_size, weight_init=TruncatedNormal(initializer_range)
         )
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dropout = nn.Dropout(1.0 - hidden_dropout_prob)
 
     def construct(self, x: ms.Tensor) -> ms.Tensor:
         return self.output(self.dropout(get_activation(self.hidden_act)(self.intermediate(x))))
@@ -175,7 +175,7 @@ def generate_factor(dims: int):
 class ScaledDotProductAttention(nn.Cell):
     def __init__(self, attention_probs_dropout_prob: float = 0.1) -> None:
         super().__init__()
-        self.dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.dropout = nn.Dropout(1.0 - attention_probs_dropout_prob)
 
     def construct(
         self,
