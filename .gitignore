@@ -142,3 +142,5 @@ debug.env
 outputs
 
 third_party
+
+bazel-*

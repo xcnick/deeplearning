@@ -20,24 +20,22 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     patchelf && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -o ~/miniconda.sh  https://mirrors.bfsu.edu.cn/anaconda/miniconda/Miniconda3-py37_4.10.3-Linux-x86_64.sh && \
-    chmod +x ~/miniconda.sh && \
-    ~/miniconda.sh -b -p /opt/conda && \
-    rm ~/miniconda.sh
-
-ENV PATH /opt/conda/bin:/usr/local/bin:$PATH
-
-RUN conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/main/ && \
-    conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/free/ && \
-    conda install cmake=3.19.6 ninja pytest mkl-devel ipykernel black && conda clean -ay
-
 RUN groupadd -g 1000 xcnick && useradd -u 1000 -g 1000 -m -d /home/xcnick xcnick -s /bin/bash && \
     adduser xcnick sudo && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 USER xcnick
 
-RUN pip config set global.index-url https://mirrors.bfsu.edu.cn/pypi/web/simple
+RUN curl -o ~/miniconda.sh  https://mirrors.bfsu.edu.cn/anaconda/miniconda/Miniconda3-py37_4.10.3-Linux-x86_64.sh && \
+    chmod +x ~/miniconda.sh && \
+    ~/miniconda.sh -b -p /home/xcnick/conda && \
+    rm ~/miniconda.sh
 
-ENV PATH /home/xcnick/.local/bin:$PATH
+ENV PATH /home/xcnick/conda/bin:/home/xcnick/.local/bin:$PATH
+
+RUN conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/main/ && \
+    conda config --add channels https://mirrors.bfsu.edu.cn/anaconda/pkgs/free/ && \
+    conda install cmake=3.19.6 ninja pytest mkl-devel ipykernel black && conda clean -ay
+
+RUN pip config set global.index-url https://mirrors.bfsu.edu.cn/pypi/web/simple
 
 WORKDIR /workspace
