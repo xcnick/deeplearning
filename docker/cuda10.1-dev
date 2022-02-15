@@ -16,7 +16,13 @@ RUN sed -i s@/archive.ubuntu.com/@/mirrors.bfsu.edu.cn/@g /etc/apt/sources.list 
     flex \
     libnuma-dev \
     nasm \
-    patchelf && \
+    patchelf \
+    libgomp1 \
+    libsm6 \
+    libxrender1 \
+    libglib2.0-dev \
+    libxext6 \
+    libgl1-mesa-glx && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1000 xcnick && useradd -u 1000 -g 1000 -m -d /home/xcnick xcnick -s /bin/bash && \
