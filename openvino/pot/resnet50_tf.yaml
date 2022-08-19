@@ -1,0 +1,36 @@
+models:
+  - name: resnet50
+
+    launchers:
+      - framework: openvino
+        device: CPU
+        adapter: classification
+
+    datasets:
+      - name: classification_dataset
+        data_source: /cephfs/data/imagenet/raw_val
+        annotation_conversion:
+          converter: imagenet
+          annotation_file: /cephfs/data/imagenet/meta/val.txt
+        reader: pillow_imread
+
+        preprocessing:
+          - type: resize
+            size: 256
+            aspect_ratio_scale: greater
+            use_pillow: True
+          - type: crop
+            size: 224
+            use_pillow: True
+          - type: rgb_to_bgr
+          - type: normalization
+            mean: [103.94, 116.78, 123.68]
+
+        metrics:
+          - name: accuracy@top1
+            type: accuracy
+            top_k: 1
+
+          - name: accuracy@top5
+            type: accuracy
+            top_k: 5

@@ -1,0 +1,21 @@
+{
+  "model": {
+    "model_name": "yolov5",
+    "model": "./fp32/onnx/yolov5_st/yolov5s_st.xml",
+    "weights": "./fp32/onnx/yolov5_st/yolov5s_st.bin"
+  },
+  "engine": {
+    "config": "./yolov5_onnx.yaml"
+  },
+  "compression": {
+    "algorithms": [
+      {
+        "name": "DefaultQuantization",
+        "params": {
+          "preset": "performance",
+          "stat_subset_size": 300
+        }
+      }
+    ]
+  }
+}

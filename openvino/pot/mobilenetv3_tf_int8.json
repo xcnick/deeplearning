@@ -1,0 +1,21 @@
+{
+  "model": {
+    "model_name": "mobilenetv3",
+    "model": "./fp32/tf/mobilenetv3/mobilenetv3.xml",
+    "weights": "./fp32/tf/mobilenetv3/mobilenetv3.bin"
+  },
+  "engine": {
+    "config": "./mobilenetv3_tf.yaml"
+  },
+  "compression": {
+    "algorithms": [
+      {
+        "name": "DefaultQuantization",
+        "params": {
+          "preset": "performance",
+          "stat_subset_size": 300
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+models:
+  - name: mobilenetv3
+
+    launchers:
+      - framework: dlsdk
+        device: CPU
+        adapter: classification
+
+    datasets:
+      - name: classification_dataset
+        data_source: /data/imagenet/raw_val
+        annotation_conversion:
+          converter: imagenet
+          annotation_file: /data/imagenet/meta/val.txt
+        reader: pillow_imread
+
+        preprocessing:
+          - type: resize
+            size: 256
+            aspect_ratio_scale: greater
+            use_pillow: True
+          - type: crop
+            size: 224
+            use_pillow: True
+
+        metrics:
+          - name: accuracy@top1
+            type: accuracy
+            top_k: 1
+
+          - name: accuracy@top5
+            type: accuracy
+            top_k: 5

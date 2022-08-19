@@ -1,0 +1,21 @@
+{
+  "model": {
+    "model_name": "resnet50",
+    "model": "./fp32/onnx/resnet50/resnet50-v1-7.xml",
+    "weights": "./fp32/onnx/resnet50/resnet50-v1-7.bin"
+  },
+  "engine": {
+    "config": "./resnet50_onnx.yaml"
+  },
+  "compression": {
+    "algorithms": [
+      {
+        "name": "DefaultQuantization",
+        "params": {
+          "preset": "performance",
+          "stat_subset_size": 300
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "model": {
+    "model_name": "resnet50",
+    "model": "./fp32/resnet50.xml",
+    "weights": "./fp32/resnet50.bin"
+  },
+  "engine": {
+    "config": "./resnet50.yaml"
+  },
+  "compression": {
+    "algorithms": [
+      {
+        "name": "DefaultQuantization",
+        "params": {
+          "preset": "performance",
+          "stat_subset_size": 300
+        }
+      }
+    ]
+  }
+}
